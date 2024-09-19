@@ -61,15 +61,15 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Novice Clan.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;229m[CLAN %1] %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;229m[CLAN %1] %2$} {
   _bufferAdd {allClan} {%0};
   _bufferAdd {novice} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;229m[%1] Novice clan members heard you say, %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;229m[%1] Novice clan members heard you say, %2$} {
   _bufferAdd {allClan} {%0};
   _bufferAdd {novice} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;229m[%1] Novice clan member heard you say, %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;229m[%1] Novice clan member heard you say, %2$} {
   _bufferAdd {allClan} {%0};
   _bufferAdd {novice} {%0};
 };
@@ -77,19 +77,19 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Clan.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;11m[CLAN] %1$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m[CLAN] %1$} {
   _bufferAdd {allClan} {%0};
   _bufferAdd {clan} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;11m[%1] clan members heard you say, %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m[%1] clan members heard you say, %2$} {
   _bufferAdd {allClan} {%0} {1};
   _bufferAdd {clan} {%0} {1};
 };
-#ACTION {~^\e[0m\e[38;5;11m[%1] clan member heard you say, %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m[%1] clan member heard you say, %2$} {
   _bufferAdd {allClan} {%0} {1};
   _bufferAdd {clan} {%0} {1};
 };
-#ACTION {~^\e[0m\e[38;5;11m[CLAN NOTICE] %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m[CLAN NOTICE] %2$} {
   _bufferAdd {allClan} {%0};
   _bufferAdd {clan} {%0};
 };
@@ -97,15 +97,15 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Tells.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;9m%1 tells you%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;9m%1 tells you%2$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {tells} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;9mYou tell %1$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;9mYou tell %1$} {
   _bufferAdd {allTalk} {%0} {1};
   _bufferAdd {tells} {%0} {1};
 };
-#ACTION {~^\e[0m\e[38;5;9mYou make a note: %1$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;9mYou make a note: %1$} {
   _bufferAdd {allTalk} {%0} {1};
   _bufferAdd {tells} {%0} {1};
 };
@@ -113,11 +113,11 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Whispers.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;14m%1 whispers%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 whispers%2$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {whispers} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14mYou whisper to %1$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14mYou whisper to %1$} {
   _bufferAdd {allTalk} {%0} {1};
   _bufferAdd {whispers} {%0} {1};
 };
@@ -125,7 +125,7 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Asks.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;14m%1 asks%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 asks%2$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
@@ -133,32 +133,32 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Says.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;14m%1 says%2\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 says%2%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14m%1 exclaims%2\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 exclaims%2%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14m%1 you exclaim.%2\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 you exclaim.%2%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
 
-#ACTION {~^\e[0m\e[38;5;14m%1 you say.\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 you say.%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14mYou say, %1\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14mYou say, %1%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14mYou say to %1\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14mYou say to %1%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14m%1 you say to %2\e[0m$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 you say to %2%!{(?:\e\[0m)*}$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {says} {%0};
 };
@@ -166,11 +166,11 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Form Talk.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;14m%1 tells the formation%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14m%1 tells the formation%2$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {form} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;14mYou tell the formation%1$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;14mYou tell the formation%1$} {
   _bufferAdd {allTalk} {%0} {1};
   _bufferAdd {form} {%0} {1};
 };
@@ -178,7 +178,7 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Yells.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;11m%1 yells%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m%1 yells%2$} {
   _bufferAdd {allTalk} {%0};
   _bufferAdd {yells} {%0};
 };
@@ -186,31 +186,31 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Hints.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;13m%1 Hint: %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;13m%1 Hint: %2$} {
   _bufferAdd {hints} {%0};
 };
 
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Allied messages.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;11m[ALLIED NOTICE] %1$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m[ALLIED NOTICE] %1$} {
   _bufferAdd {allied} {%0} {1};
   _bufferAdd {allClan} {%0} {1};
 };
-#ACTION {~^\e[0m\e[38;5;220m[ALLIED %1] %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;220m[ALLIED %1] %2$} {
   _bufferAdd {allied} {%0};
   _bufferAdd {allClan} {%0};
 };
-#ACTION {~^\e[0m\e[38;5;220m[ALLIED] %2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;220m[ALLIED] %2$} {
   _bufferAdd {allied} {%0};
   _bufferAdd {allClan} {%0};
 };
 
-#ACTION {~^\e[0m\e[38;5;220m[%1] alliance members heard you say%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;220m[%1] alliance members heard you say%2$} {
   _bufferAdd {allied} {%0} {1};
   _bufferAdd {allClan} {%0} {1};
 };
-#ACTION {~^\e[0m\e[38;5;220m[%1] alliance member heard you say%2$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;220m[%1] alliance member heard you say%2$} {
   _bufferAdd {allied} {%0} {1};
   _bufferAdd {allClan} {%0} {1};
 };
@@ -218,7 +218,7 @@ _panelCreate {chat} {BUFFER} {chat};
 #NOP --------------------------------------------------------------------------;
 #NOP Capture Chat relays.;
 #NOP --------------------------------------------------------------------------;
-#ACTION {~^\e[0m\e[38;5;11m%1[%2]@#%3: %4$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m%1[%2]@#%3: %4$} {
   _bufferAdd {chat} {%0};
   _bufferAdd {allTalk} {%0};
 
@@ -228,7 +228,7 @@ _panelCreate {chat} {BUFFER} {chat};
   _bufferAdd {chat_%3} {%0};
 
 };
-#ACTION {~^\e[0m\e[38;5;11m%1@#%2: %3$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m%1@#%2: %3$} {
   _bufferAdd {chat} {%0};
   _bufferAdd {allTalk} {%0};
 
@@ -238,7 +238,7 @@ _panelCreate {chat} {BUFFER} {chat};
   _bufferAdd {chat_%2} {%0};
 
 };
-#ACTION {~^\e[0m\e[38;5;11m[%1] people in #%2 heard you relay %3$} {
+#ACTION {~^%!{(?:\e\[0m)*}\e[38;5;11m[%1] people in #%2 heard you relay %3$} {
   _bufferAdd {chat} {%0};
   _bufferAdd {allTalk} {%0};
 

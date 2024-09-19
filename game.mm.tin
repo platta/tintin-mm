@@ -22,13 +22,6 @@
 #NOP logging in.;
 #ALIAS {__gameBeforeLogin} {
     #NOP %0;
-    #NOP Core classes.;
-    _classLoad {split} {plugins};
-    _classLoad {buffer} {plugins};
-    _classLoad {widget} {plugins};
-    _classLoad {panel} {plugins};
-
-    #NOP MM classes.;
     _classLoad {mmevents} {game.mm/plugins};
     _classLoad {captures} {game.mm/plugins};
     _classLoad {gmcp} {game.mm/plugins};
