@@ -1,0 +1,36 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Walk in circles!;
+#NOP --------------------------------------------------------------------------;
+#CLASS {autowalk} {OPEN};
+
+#NOP Controls if auto-walk is enabled.;
+#VARIABLE {AUTOWALK} {0};
+
+#NOP Controls delay between room moves.;
+#VARIABLE {AUTOWALK_DELAY} {0};
+
+#NOP Controls direction of rotation.;
+#VARIABLE {AUTO_WALK_DIRECTION} {CLOCKWISE};
+
+#NOP Stores current direction we are moving in.;
+#VARIABLE {AUTO_WALK_CURRENT_DIRECTION} {n};
+
+#ALIAS {_autowalk} {
+    #NOP %0;
+    #VARIABLE {AUTOWALK} {1};
+    look;
+};
+
+#ALIAS {_autowalkStop} {
+    #VARIABLE {AUTOWALK} {0};
+};
+
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_autowalkRoomInfoHandler} {100};
+#ALIAS {_autowalkRoomInfoHandler} {
+    #NOP %0;
+    #IF {$AUTOWALK} {
+        _autoWalk;
+    }
+};
+
+#CLASS {autowalk} {CLOSE};

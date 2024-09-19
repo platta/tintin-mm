@@ -1,0 +1,43 @@
+#CLASS {mmdesktop} {OPEN};
+
+_bufferCreate {logs} {0};
+_loggingSetBuffer {logs};
+_panelCreate {logs} {BUFFER} {logs};
+
+#ALIAS {_desktopLayout} {
+    #NOP %0;
+    _splitSize {TOP} {16};
+    _splitSize {BOTTOM} {5};
+    _splitSize {RIGHT} {-100};
+
+    _panelDock {logs} {TOP} {4} {4} {6} {6};
+    _panelDock {allClan} {TOP} {1} {1} {6} {3};
+    _panelDock {allTalk} {TOP} {1} {4} {3} {6};
+
+    _panelDock {roomInfo} {BOTTOM} {1} {5} {6} {6};
+    _panelDock {vitals} {BOTTOM} {1} {1} {6} {2};
+
+    _panelDock {map} {RIGHT} {1} {1} {5} {6};
+    _panelDock {roomDetail} {RIGHT} {6} {1} {6} {6};
+};
+
+#ALIAS {_mobileLayout} {
+    #NOP %0;
+    _splitSize {TOP} {16};
+    _splitSize {BOTTOM} {5};
+    _splitSize {RIGHT} {-72};
+
+    _panelHide {logs};
+    _panelDock {allClan} {TOP} {1} {1} {4} {6};
+    _panelDock {allTalk} {TOP} {5} {1} {6} {6};
+
+    _panelDock {roomInfo} {BOTTOM} {1} {4} {6} {6};
+    _panelDock {vitals} {BOTTOM} {1} {1} {6} {3};
+
+    _panelDock {map} {RIGHT} {1} {1} {6} {6};
+    _panelHide {roomDetail} {RIGHT} {6} {1} {6} {6};
+};
+
+_desktopLayout;
+
+#CLASS {mmdesktop} {CLOSE};

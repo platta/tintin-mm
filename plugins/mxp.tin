@@ -1,0 +1,764 @@
+#NOP --------------------------------------------------------------------------;
+#NOP MXP Support;
+#NOP --------------------------------------------------------------------------;
+#CLASS {mxp} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Variables;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Values stored via !EN and V tags.;
+#VARIABLE {MXP} {};
+
+#NOP PCRE expressions that get used a bunch.;
+#VARIABLE {PCRE_ATTRIBUTE_VALUE} {"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)+'|\w+};
+#VARIABLE {PCRE_ARBITRARY_ATTRIBUTE} {(?:\s+\w+(?:=(?:${PCRE_ATTRIBUTE_VALUE}))?)};
+
+#NOP Holds all supported MXP elements. The built-in ones are loaded below, and;
+#NOP any custom elements defined using the !ELEMENT tag are added as well.;
+#VARIABLE {MXP_ELEMENTS} {};
+
+#NOP --------------------------------------------------------------------------;
+#NOP MXP Element Management;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Create a new element;
+#NOP %1 - Element name;
+#NOP %2 - Number of characters used in abbreviated name (0 if no abbreviation);
+#NOP %3 - Is this an empty tag? (no closing tag) (0|1);
+#NOP %4 - Function to call when matched;
+#NOP %5 - Element definition (only for custom elements);
+#ALIAS {_mxpCreateElement} {
+    #NOP %0;
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {%1};
+
+    #NOP Make sure element doesn't already exist.;
+    #IF {&MXP_ELEMENTS[$name]} {
+        _warn {_mxpCreateElement: MXP Element '$name' already exists};
+        #RETURN;
+    };
+
+    #LOCAL {abbreviate} {};
+    #MATH {abbreviate} { %2};
+
+    #LOCAL {empty} {};
+    #MATH {empty} { %3};
+
+    #VARIABLE {MXP_ELEMENTS[$name]} {
+        {name} {$name}
+        {abbreviate} {$abbreviate}
+        {empty} {$empty}
+        {function} {%4}
+        {definition} {%5}
+    };
+
+    _mxpRegister {$MXP_ELEMENTS[$name]};
+};
+
+#NOP Add a positional attribute to an MXP element;
+#NOP %1 - Element name (full name, not abbreviated);
+#NOP %2 - Attribute name;
+#NOP %3 - Required (0|1) (only applies to positional attributes);
+#ALIAS {_mxpCreatePositional} {
+    #NOP %0;
+    #LOCAL {element} {};
+    #FORMAT {element} {%u} {%1};
+
+    #NOP Make sure element exists.;
+    #IF {!&MXP_ELEMENTS[$element]} {
+        _warn {_mxpCreateAttribute: MXP Element '$element' does not exist};
+        #RETURN;
+    };
+
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {%2};
+
+    #IF {@_mxpAttributeExists{{$element}; {$name}}} {
+        _warn {_mxpCreateAttribute: MXP Element '$element' already has an attribute named '$name'};
+        #RETURN;
+    };
+
+    #LOCAL {required} {};
+    #MATH {required} { %3};
+
+    #NOP Can't put a required positional attribute after optional ones.;
+    #IF {$required && &MXP_ELEMENTS[$element][positional][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&MXP_ELEMENTS[$element][positional][]} {i} {
+            #IF {!$MXP_ELEMENTS[$element][positional][$i][required]} {
+                _warn {_mxpCreateAttribute: MXP Element '$element' has one or more optional positional attributes - All required positional attributes must come first};
+                #RETURN;
+            }
+        };
+    };
+
+    #LIST {MXP_ELEMENTS[$element][positional]} {INSERT} {-1} {
+        {name} {$name}
+        {required} {$required}
+    };
+
+    _mxpRegister {$MXP_ELEMENTS[$element]};
+};
+
+#NOP Add a named attribute to an MXP element;
+#NOP %1 - Element name (full name, not abbreviated);
+#NOP %2 - Attribute name;
+#NOP %3 - Required (0|1);
+#ALIAS {_mxpCreateAttribute} {
+    #NOP %0;
+    #LOCAL {element} {};
+    #FORMAT {element} {%u} {%1};
+
+    #NOP Make sure element exists.;
+    #IF {!&MXP_ELEMENTS[$element]} {
+        _warn {_mxpCreateAttribute: MXP Element '$element' does not exist};
+        #RETURN;
+    };
+
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {%2};
+
+    #IF {@_mxpAttributeExists{{$element}; {$name}}} {
+        _warn {_mxpCreateAttribute: MXP Element '$element' already has an attribute named '$name'};
+        #RETURN;
+    };
+
+    #LOCAL {required} {};
+    #MATH {required} { %3};
+
+    #LIST {MXP_ELEMENTS[$element][attributes]} {INSERT} {-1} {
+        {name} {$name}
+        {required} {$required}
+    };
+
+    _mxpRegister {$MXP_ELEMENTS[$element]};
+};
+
+#NOP Unregister the substitution expression for an element.;
+#NOP %1 - Element variable;
+#ALIAS {_mxpUnregister} {
+    #NOP %0;
+    #NOP Grab the element into a named variable.;
+    #LOCAL {element} {%1};
+    #IF {"$element[pcre]" !== ""} {
+        #LINE {QUIET} {#UNSUBSTITUTE {~%!{${element[pcre]}}};};
+    };
+}
+
+#NOP Generate PCRE expression for element and register substitution.;
+#NOP %1 - Element variable;
+#ALIAS {_mxpRegister} {
+    #NOP %0;
+    #NOP Grab the element into a named variable.;
+    #LOCAL {element} {%1};
+    _mxpUnregister {$element};
+
+    #NOP Start building the result.;
+    #LOCAL {pcre} {(?i)<};
+
+    #NOP ----------------------------------------------------------------------;
+    #NOP Figure out the opening tag portion.;
+
+    #IF {$element[abbreviate]} {
+        #NOP The abbreviated tag;
+        #LOCAL {abbreviation} {};
+        #FORMAT {abbreviation} {%.${element[abbreviate]}s} {$element[name]};
+
+        #NOP The remainder of the full tag;
+        #LOCAL {remainder} {};
+        #LOCAL {length} {};
+        #FORMAT {length} {%L} {$element[name]};
+        #MATH {length} {$length - $element[abbreviate]};
+        #FORMAT {remainder} {%r} {$element[name]};
+        #FORMAT {remainder} {%.${length}s} {$remainder};
+        #FORMAT {remainder} {%r} {$remainder};
+
+        #LOCAL {pcre} {${pcre}(${abbreviation}(?:${remainder})?)};
+    }; #ELSE {
+        #LOCAL {pcre} {${pcre}(${element[name]})};
+    };
+
+    #NOP ----------------------------------------------------------------------;
+    #NOP Next deal with positional elements. We expect these to be in a precise;
+    #NOP order, so we can capture them definitively.;
+
+    #NOP - Capture group 1 is always the tag name;
+    #NOP - Positionals are captured in groups 2 and beyond;
+    #NOP - All tags are captured in the same group since we can't depend on;
+    #NOP   their order.;
+    #IF {&element[positional][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&element[positional][]} {i} {
+            #IF {$element[positional][$i][required]} {
+                #LOCAL {pcre} {${pcre}(?:\s+(${PCRE_ATTRIBUTE_VALUE}))};
+            }; #ELSE {
+                #LOCAL {pcre} {${pcre}(?:\s+(${PCRE_ATTRIBUTE_VALUE}))?};
+            };
+        };
+    };
+
+    #NOP ----------------------------------------------------------------------;
+    #NOP Capture additional attributes. These can be in any order, so we will;
+    #NOP just capture all of them together. The only thing to look for is if;
+    #NOP one or more of them are required. If so, we modify the quantity of the;
+    #NOP attribute regex that's required for a match.;
+
+    #IF {&element[attributes][]} {
+        #NOP Count number of required attributes;
+        #LOCAL {requiredAttributes} {0};
+        #LOCAL {i} {};
+        #LOOP {1} {&element[attributes][]} {i} {
+            #IF {$element[attributes][$i][required]} {
+                #MATH {requiredAttributes} {$requiredAttributes + 1};
+            };
+        };
+
+        #NOP Build generic attributes;
+        #LOCAL {pcre} {${pcre}((?:\s+\w+(?:=(?:${PCRE_ATTRIBUTE_VALUE}))?){${requiredAttributes},})};
+    };
+
+    #NOP ----------------------------------------------------------------------;
+    #NOP Capture the close of the opening tag.;
+    #LOCAL {pcre} {${pcre}\s*>};
+
+
+    #NOP ----------------------------------------------------------------------;
+    #NOP Finally, if this is not an empty tag, capture the text and match;
+    #NOP If not empty grab text and closing tag;
+    #NOP Need to know if it's empty, if it has an abbreviation;
+    #LOCAL {isEmpty} {};
+    #MATH {isEmpty} { $element[empty]};
+    #IF {!$isEmpty} {
+        #LOCAL {pcre} {${pcre}(.+?)(?=<\/\1>)<\/\1>};
+    };
+
+    #NOP Register substitution.;
+    #VARIABLE {MXP_ELEMENTS[$element[name]][pcre]} {$pcre};
+    #SUBSTITUTE {~%!{${pcre}}} {@_mxpParseElement{{%%1}; {%%0}}};
+};
+
+#NOP Parse a matched element;
+#NOP %1 - Tag name;
+#NOP %2 - Entire match;
+#FUNCTION {_mxpParseElement} {
+    #NOP Look up tag, what we matched might be an abbreviation!;
+    #LOCAL {element} {@_mxpGetElement{{%1}}};
+
+    #IF {!&element[name]} {
+        _warn {Matched element '%1' but no such element defined};
+        #RETURN {%2};
+    }
+
+    _debug {Parsing MXP tag ${element[name]}};
+
+    #IF {"$element[name]" === "VERSION"} {
+        @_mxpVersion{};
+    }
+
+    #NOP Extract all matches.;
+    #LOCAL {matches} {};
+    #CONFIG CONVERT ON;
+    #LINE {QUIET} {#ECHO {%2}};
+    #CONFIG CONVERT OFF;
+    #REGEXP {%2} {%!{$element[pcre]}} {
+        #NOP Hopefully we never need more than 10? I don't know how to access thes;
+        #NOP Skip first match, it's always the tag.;
+        #NOP #LIST {matches} {INSERT} {-1} {&1};
+        #LIST {matches} {INSERT} {-1} {&2};
+        #LIST {matches} {INSERT} {-1} {&3};
+        #LIST {matches} {INSERT} {-1} {&4};
+        #LIST {matches} {INSERT} {-1} {&5};
+        #LIST {matches} {INSERT} {-1} {&6};
+        #LIST {matches} {INSERT} {-1} {&7};
+        #LIST {matches} {INSERT} {-1} {&8};
+        #LIST {matches} {INSERT} {-1} {&9};
+        #LIST {matches} {INSERT} {-1} {&10};
+    };
+
+    #NOP Extract all attributes of this tag so we can act on it.;
+    #LOCAL {parsed} {};
+
+    #NOP If there are positional attributes defined, expect to find them in;
+    #NOP order.;
+    #IF {&element[positional][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&element[positional][]} {i} {
+            #LOCAL {unquoted} {};
+            #LIST {matches} {GET} {1} {unquoted};
+            #LIST {matches} {DELETE} {1};
+
+            #LOCAL {unquoted} {@_mxpUnquote{{$unquoted}}};
+            #LOCAL {parsed[$element[positional][$i][name]]} {$unquoted};
+        };
+    };
+
+    #IF {&element[attributes][]} {
+        #NOP All named attributes will be in the next match. We have to perform;
+        #NOP Further regex operations on that match to pull out the individual;
+        #NOP named attributes.;
+        #LOCAL {named} {};
+        #LIST {matches} {GET} {1} {named};
+        #LIST {matches} {DELETE} {1};
+
+        _debug {$named};
+
+        #LOCAL {i} {};
+        #LOOP {1} {&element[attributes][]} {i} {
+            #LOCAL {attribute} {$element[attributes][$i]}
+
+            #NOP Store blank value in case the regex doesn't match;
+            #LOCAL {parsed[$attribute[name]]} {};
+
+            #NOP Search for it and store a match.;
+            #NOP #VARIABLE {PCRE_ATTRIBUTE_VALUE} {"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)+'|\w+};
+            #REGEXP {$named} {%!{(?i)\b(${attribute[name]})(?:=(${PCRE_ATTRIBUTE_VALUE}))?}} {
+                _debug {Matched $attribute[name] &2};
+                #LOCAL {unquoted} {@_mxpUnquote{{&2}}};
+                #IF {"$unquoted" !== ""} {
+                    #VARIABLE {parsed[$attribute[name]]} {$unquoted};
+                }; #ELSE {
+                    #FORMAT {parsed[$attribute[name]]} {%u} {&1};
+                };
+            };
+        };
+    };
+
+    #IF {!$element[empty]} {
+        #NOP If the element is not empty, the contents will be the next match.;
+        #LIST {matches} {GET} {1} {parsed[TEXT]};
+        #LIST {matches} {DELETE} {1};
+    };
+
+    #VARIABLE {__json} {$parsed};
+    #LINE {JSON} {__json} {#VARIABLE {__json} &0;};
+
+    #NOP Strip newlines and extra space.;
+    #REPLACE {__json} {\n%s} {};
+    #REPLACE {__json} {" : "} {":"};
+    _debug {$__json};
+
+    #NOP Call an alias to actually DO stuff with this event.;
+    #IF {"$element[function]" !== ""} {
+        #LOCAL {invocation} {${element[function]}{{$element}; {$parsed}}};
+        #RETURN {$invocation};
+    }; #ELSE {
+        _warn {Matched element '$element[name]' but no handler function exists};
+        #RETURN {$parsed[TEXT]};
+    };
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Utility Functions;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Check if an attribute exists (positional or named);
+#NOP %1 - Element name;
+#NOP %2 - Attribute name;
+#FUNCTION {_mxpAttributeExists} {
+    #LOCAL {element} {};
+    #FORMAT {element} {%u} {%1};
+
+    #NOP Make sure element exists.;
+    #IF {!&MXP_ELEMENTS[$element]} {
+        _warn {_mxpCreateAttribute: MXP Element '$element' does not exist};
+        #RETURN {0};
+    };
+
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {%2};
+
+    #NOP Check positional attributes.;
+    #IF {&MXP_ELEMENTS[$element][positional][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&MXP_ELEMENTS[$element][positional][]} {i} {
+            #IF {"$MXP_ELEMENTS[$element][positional][$i][name]" === "$name"} {
+                #RETURN {1};
+            };
+        };
+    };
+
+    #NOP Check named attributes.;
+    #IF {&MXP_ELEMENTS[$element][attributes][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&MXP_ELEMENTS[$element][attributes][]} {i} {
+            #IF {"$MXP_ELEMENTS[$element][attributes][$i][name]" === "$name"} {
+                #RETURN {1};
+            };
+        };
+    };
+
+    #RETURN {0};
+};
+
+#NOP Find an element by its name or abbreviation.;
+#NOP %1 - Given name;
+#FUNCTION {_mxpGetElement} {
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {%1};
+
+    #FOREACH {$MXP_ELEMENTS[%*]} {element} {
+        #IF {"$element[name]" === "$name"} {
+            #RETURN {$element};
+        };
+
+        #IF {$element[abbreviate]} {
+            #LOCAL {abbreviated} {};
+            #FORMAT {abbreviated} {%.${element[abbreviate]}s} {$element[name]};
+            #IF {"$abbreviated" == "$name"} {
+                #RETURN {$element};
+            };
+        }
+    };
+
+    #RETURN {};
+};
+
+#NOP Remove quotes from a string.;
+#NOP %1 - String;
+#FUNCTION {_mxpUnquote} {
+    #LOCAL {first} {};
+    #FORMAT {first} {%.1s} {%1};
+
+    #NOP String matching with quotes gets hairy. Split them up.;
+    #LOCAL {quoted} {};
+    #MATH {quoted} {"$first" === "'"};
+    #MATH {quoted} {$quoted || {$first} === {"}};
+
+    #IF {$quoted} {
+        #LOCAL {length} {};
+        #FORMAT {length} {%L} {%1};
+        #MATH {length} {$length - 1};
+        #FORMAT {result} {%.${length}s} {%1};
+        #MATH {length} {$length - 1};
+        #FORMAT {result} {%.-${length}s} {$result};
+    }; #ELSE {
+        #VARIABLE {result} {%1};
+    };
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Built-In MXP Elements;
+#NOP --------------------------------------------------------------------------;
+
+#NOP --------------------------------------------------------------------------;
+#NOP !ELEMENT;
+_mxpCreateElement {!ELEMENT} {3} {1} {@_mxpElementHandler};
+_mxpCreatePositional {!ELEMENT} {NAME} {1};
+_mxpCreatePositional {!ELEMENT} {DEFINITION};
+_mxpCreateAttribute {!ELEMENT} {ATT};
+_mxpCreateAttribute {!ELEMENT} {TAG};
+_mxpCreateAttribute {!ELEMENT} {FLAG};
+_mxpCreateAttribute {!ELEMENT} {OPEN};
+_mxpCreateAttribute {!ELEMENT} {DELETE};
+_mxpCreateAttribute {!ELEMENT} {EMPTY};
+
+#NOP Handle an !ELEMENT tag when matched.;
+#NOP %1 - Element definition;
+#NOP %2 - Parsed values from match;
+#FUNCTION {_mxpElementHandler} {
+    #LOCAL {element} {%1};
+    #LOCAL {values} {%2};
+
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {$values[NAME]};
+
+    #NOP Option to delete a custom element.;
+    #LOCAL {delete} {};
+    #IF {"$values[DELETE]" == "DELETE"} {
+        _mxpUnregister {$element};
+        #UNVARIABLE {MXP_ELEMENTS[$name]};
+        #RETURN {};
+    };
+
+    #LOCAL {empty} {};
+    #MATH {empty} {"$values[EMPTY]" == "EMPTY"};
+
+    _mxpCreateElement {$name} {0} {$empty} {@_mxpCustomElementHandler} {$values[DEFINITION]};
+
+    #LOCAL {attributes} {$values[ATT]};
+    #IF {"$attributes" !== ""} {
+        #LIST {attributes} {EXPLODE} { };
+        #LOCAL {i} {};
+        #LOOP {1} {&attributes[]} {i} {
+            #LOCAL {attributeName} {};
+            #FORMAT {attributeName} {%u} {$attributes[$i]};
+            _mxpCreateAttribute {$name} {$attributeName};
+        };
+    };
+
+    #RETURN {};
+};
+
+#NOP Handle any custom element when matched.;
+#NOP %1 - Element definition;
+#NOP %2 - Parsed values from match;
+#FUNCTION {_mxpCustomElementHandler} {
+    #LOCAL {values} {%2};
+    #RETURN {$values[TEXT]};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP !ATTLIST;
+_mxpCreateElement {!ATTLIST} {3} {1} {@_mxpAttlistHandler};
+_mxpCreatePositional {!ATTLIST} {ELEMENTNAME} {1};
+_mxpCreatePositional {!ATTLIST} {ATTRIBUTES} {1};
+
+#NOP Handle ATTLIST when matched.;
+#NOP %1 - Element definition;
+#NOP %2 - Parsed values from match;
+#FUNCTION {_mxpAttlistHandler} {
+    #LOCAL {values} {%2};
+
+    #LOCAL {elementName} {};
+    #FORMAT {elementName} {%u} {$values[ELEMENTNAME]};
+
+    #LOCAL {attributes} {$values[ATTRIBUTES]};
+    #IF {"$attributes" !== ""} {
+        #LIST {attributes} {EXPLODE} { };
+        #LOCAL {i} {};
+        #LOOP {1} {&attributes[]} {i} {
+            #LOCAL {attributeName} {};
+            #FORMAT {attributeName} {%u} {$attributes[$i]};
+            _mxpCreateAttribute {$elementName} {$attributeName};
+        };
+    };
+
+    #RETURN {};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP !ENTITY;
+_mxpCreateElement {!ENTITY} {3} {1} {@_mxpEntityHandler};
+_mxpCreatePositional {!ENTITY} {NAME} {1};
+_mxpCreatePositional {!ENTITY} {VALUE} {1};
+_mxpCreateAttribute {!ENTITY} {DESC};
+_mxpCreateAttribute {!ENTITY} {PRIVATE};
+_mxpCreateAttribute {!ENTITY} {PUBLISH};
+_mxpCreateAttribute {!ENTITY} {DELETE};
+_mxpCreateAttribute {!ENTITY} {ADD};
+_mxpCreateAttribute {!ENTITY} {REMOVE};
+
+#NOP Handle ENTITY when matched.;
+#NOP %1 - Element definition;
+#NOP %2 - Parsed values from match;
+#FUNCTION {_mxpEntityHandler} {
+    #LOCAL {values} {%2};
+
+    #IF {"$values[DELETE]" == "DELETE"} {
+        #UNVARIABLE {$MXP[$values[NAME]]};
+        #RETURN {};
+    };
+
+    #LOCAL {private} {};
+    #MATH {private} {"$values[PRIVATE]" == "PRIVATE"};
+
+    #LOCAL {publish} {};
+    #MATH {publish} {"$values[PUBLISH]" == "PUBLISH"};
+
+    #LOCAL {add} {};
+    #MATH {add} {"$values[ADD]" == "ADD"};
+
+    #LOCAL {remove} {};
+    #MATH {remove} {"$values[REMOVE]" == "REMOVE"};
+
+    #VARIABLE {MXP[$values[NAME]][desc]} {$values[DESC]};
+    #VARIABLE {MXP[$values[NAME]][private]} {$private};
+    #VARIABLE {MXP[$values[NAME]][publish]} {$publish};
+
+    #IF {$add} {
+        #NOP Check there's a value that's not a list.;
+        #IF {&MXP[$values[NAME]][value] && !&MXP[$values[NAME]][value][]} {
+            #NOP Convert to list.;
+            #LIST {MXP[$values[NAME]][value]} {ADD} {$MXP[$values[NAME]][value]};
+        };
+
+        #NOP Add item to list.;
+        #LIST {MXP[$values[NAME]][value]} {ADD} {$values[VALUE]};
+    }; #ELSEIF {$remove} {
+        #IF {&MXP[$values[NAME]][value][]} {
+            #LOCAL {i} {};
+            #LOOP {1} {&MXP[$values[NAME]][value][]} {i} {
+                #IF {"$MXP[$values[NAME]][value][$i]" === "$values[VALUE]"}
+            };
+        };
+    }; #ELSE {
+        #VARIABLE {MXP[$values[NAME]][value]} {$values[VALUE]};
+    };
+
+    #RETURN {};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP !VAR;
+_mxpCreateElement {VAR} {1} {0} {@_mxpVarHandler};
+_mxpCreatePositional {VAR} {NAME};
+_mxpCreateAttribute {VAR} {DESC};
+_mxpCreateAttribute {VAR} {PRIVATE};
+_mxpCreateAttribute {VAR} {PUBLISH};
+_mxpCreateAttribute {VAR} {DELETE};
+_mxpCreateAttribute {VAR} {ADD};
+_mxpCreateAttribute {VAR} {REMOVE};
+
+#NOP Handle the VAR element when matched.;
+#NOP %1 - Element definition;
+#NOP %2 - Parsed values from match;
+#FUNCTION {_mxpVarHandler} {
+    #LOCAL {values} {%2};
+
+    #IF {"$values[DELETE]" == "DELETE"} {
+        #UNVARIABLE {$MXP[$values[NAME]]};
+        #RETURN {$values[TEXT]};
+    };
+
+    #LOCAL {private} {};
+    #MATH {private} {"$values[PRIVATE]" == "PRIVATE"};
+
+    #LOCAL {publish} {};
+    #MATH {publish} {"$values[PUBLISH]" == "PUBLISH"};
+
+    #LOCAL {add} {};
+    #MATH {add} {"$values[ADD]" == "ADD"};
+
+    #LOCAL {remove} {};
+    #MATH {remove} {"$values[REMOVE]" == "REMOVE"};
+
+    #IF {$add || $remove} {
+        #NOP TODO: Handle variable lists.;
+    }; #ELSE {
+        #VARIABLE {MXP[$values[NAME]]} {
+            {value} {$values[TEXT]}
+            {desc} {$values[DESC]}
+            {private} {$private}
+            {publish} {$publish}
+        };
+    };
+
+    #RETURN {$values[TEXT]};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP !TAG;
+_mxpCreateElement {!TAG};
+_mxpCreatePositional {!TAG} {INDEX} {1};
+_mxpCreateAttribute {!TAG} {WINDOWNAME};
+_mxpCreateAttribute {!TAG} {FORE};
+_mxpCreateAttribute {!TAG} {BACK};
+_mxpCreateAttribute {!TAG} {GAG};
+_mxpCreateAttribute {!TAG} {ENABLE};
+_mxpCreateAttribute {!TAG} {DISABLE};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Text formatting;
+_mxpCreateElement {BOLD} {1};
+_mxpCreateElement {STRONG};
+_mxpCreateElement {ITALIC} {1};
+_mxpCreateElement {EM};
+_mxpCreateElement {UNDERLINE} {1};
+_mxpCreateElement {STRIKEOUT} {1};
+_mxpCreateElement {HIGH} {1};
+
+_mxpCreateElement {COLOR} {1};
+_mxpCreateAttribute {COLOR} {FORE} {1};
+_mxpCreateAttribute {COLOR} {BACK};
+
+_mxpCreateElement {FONT};
+_mxpCreateAttribute {FONT} {FACE} {1};
+_mxpCreateAttribute {FONT} {SIZE};
+_mxpCreateAttribute {FONT} {COLOR};
+_mxpCreateAttribute {FONT} {BACK};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Text structuring;
+_mxpCreateElement {NOBR} {0} {1};
+_mxpCreateElement {P};
+_mxpCreateElement {BR} {0} {1};
+_mxpCreateElement {SBR} {0} {1};
+
+#NOP --------------------------------------------------------------------------;
+#NOP A (anchor);
+_mxpCreateElement {A};
+_mxpCreateAttribute {A} {HREF} {1};
+_mxpCreateAttribute {A} {HINT};
+_mxpCreateAttribute {A} {EXPIRE};
+
+#NOP --------------------------------------------------------------------------;
+#NOP SEND;
+_mxpCreateElement {SEND};
+_mxpCreateAttribute {SEND} {HREF};
+_mxpCreateAttribute {SEND} {HINT};
+_mxpCreateAttribute {SEND} {PROMPT};
+_mxpCreateAttribute {SEND} {EXPIRE};
+
+#NOP --------------------------------------------------------------------------;
+#NOP EXPIRE;
+_mxpCreateElement {EXPIRE};
+_mxpCreatePositional {EXPIRE} {NAME};
+
+#NOP --------------------------------------------------------------------------;
+#NOP VERSION;
+_mxpCreateElement {VERSION} {0} {1};
+
+#NOP --------------------------------------------------------------------------;
+#NOP SUPPORT;
+_mxpCreateElement {SUPPORT} {0} {1};
+
+#NOP --------------------------------------------------------------------------;
+#NOP GAUGE;
+_mxpCreateElement {GAUGE} {0} {1};
+_mxpCreatePositional {GAUGE} {ENTITYNAME} {1};
+_mxpCreateAttribute {GAUGE} {MAX};
+_mxpCreateAttribute {GAUGE} {CAPTION};
+_mxpCreateAttribute {GAUGE} {COLOR};
+
+#NOP --------------------------------------------------------------------------;
+#NOP STAT;
+_mxpCreateElement {STAT} {0} {1};
+_mxpCreatePositional {STAT} {ENTITYNAME} {1};
+_mxpCreateAttribute {STAT} {MAX};
+_mxpCreateAttribute {STAT} {CAPTION};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Event handlers;
+#NOP --------------------------------------------------------------------------;
+
+_eventHandlerRegister {IAC WILL MXP} {_mxpWillMxpHandler};
+#ALIAS {_mxpWillMxpHandler} {
+    #NOP %0;
+    _info {Sending DO MXP};
+    #SEND {$TELNET[IAC]$TELNET[DO]$TELNET[MXP]\};
+};
+
+_eventHandlerRegister {IAC DO MXP} {_mxpDoMxpHandler};
+#ALIAS {_mxpDoMxpHandler} {
+    #NOP %0;
+    _info {Sending WILL MXP};
+    #SEND {$TELNET[IAC]$TELNET[WILL]$TELNET[MXP]\};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Stuff for link clicking - to visit later;
+#NOP --------------------------------------------------------------------------;
+
+_eventHandlerRegister {PRESSED LINK MXP MOUSE BUTTON ONE} {_mxpPressedLinkHandler};
+#ALIAS {_mxpPressedLinkHandler} {
+    #NOP %0;
+    #SEND {%5};
+};
+
+#NOP #SUBSTITUTE {<check_eq_scrying desc="%1">%2</check_eq_scrying>} {@mxp_link{{MXP}; {check equipment scrying %1}; {%2}}};
+#FUNCTION {mxp_link} {
+    _debug {MXP LINK};
+    #line sub esc #var result {\e]68;1;%1;%2\a\e[4m%3\e[24m};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Flat substitutions for special characters;
+#NOP --------------------------------------------------------------------------;
+
+#SUBSTITUTE {&lt;} {<};
+#SUBSTITUTE {&gt;} {>};
+#SUBSTITUTE {&quot;} {"};
+#SUBSTITUTE {&nbsp;} { };
+
+#CLASS {mxp} {CLOSE};

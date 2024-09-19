@@ -1,0 +1,99 @@
+#NOP --------------------------------------------------------------------------;
+#NOP GMCP events class.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {gmcp} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Send a GMCP request.;
+#NOP %1 - Request name.;
+#ALIAS {_gmcpSendRequest} {
+    #NOP %0;
+    #SEND {$TELNET[IAC]$TELNET[SB]$TELNET[GMCP] %1 \{"":""\} $TELNET[IAC]$TELNET[SE]\};
+};
+
+#NOP Respond to the WILL GMCP message.;
+_eventHandlerRegister {IAC WILL GMCP} {__gmcpWillGmcpResponse} {1};
+#ALIAS {__gmcpWillGmcpResponse} {
+    #NOP %0;
+    #INFO SYSTEM SAVE;
+    #SEND {$TELNET[IAC]$TELNET[DO]$TELNET[GMCP]\};
+    #SEND {$TELNET[IAC]$TELNET[SB]$TELNET[GMCP] core.hello { "client": "$info[SYSTEM][CLIENT_NAME]", "version": "$info[SYSTEM][CLIENT_VERSION]" } $TELNET[IAC]$TELNET[SE]\};
+    #SEND {$TELNET[IAC]$TELNET[SB]$TELNET[GMCP] core.supports.set [ "Room 1", "Char 1", "Comm 1", "Char.Items 1", "Char.Skills 1", "Core 1", "Debug 1", "IRE.Composer 1" ] $TELNET[IAC]$TELNET[SE]\};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.vitals IAC SE} {__gmcpReceivedCharVitals} {1};
+#ALIAS {__gmcpReceivedCharVitals} {
+    #NOP %0;
+    #VAR {GMCP[char][vitals]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.base IAC SE} {__gmcpReceivedCharBase} {1};
+#ALIAS {__gmcpReceivedCharBase} {
+    #NOP %0;
+    #VAR {GMCP[char][base]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.maxstats IAC SE} {__gmcpReceivedCharMaxstats} {1};
+#ALIAS {__gmcpReceivedCharMaxstats} {
+    #NOP %0;
+    #VAR {GMCP[char][maxstats]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.stats IAC SE} {__gmcpReceivedCharStats} {1};
+#ALIAS {__gmcpReceivedCharStats} {
+    #NOP %0;
+    #VAR {GMCP[char][stats]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.status IAC SE} {__gmcpReceivedCharStatus} {1};
+#ALIAS {__gmcpReceivedCharStatus} {
+    #NOP %0;
+    #VAR {GMCP[char][status]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.worth IAC SE} {__gmcpReceivedCharWorth} {1};
+#ALIAS {__gmcpReceivedCharWorth} {
+    #NOP %0;
+    #VAR {GMCP[char][worth]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.clan IAC SE} {__gmcpReceivedCharClan} {1};
+#ALIAS {__gmcpReceivedCharClan} {
+    #NOP %0;
+    #VAR {GMCP[char][clan]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.good_chance IAC SE} {__gmcpReceivedCharGoodChance} {1};
+#ALIAS {__gmcpReceivedCharGoodChance} {
+    #NOP %0;
+    #VAR {GMCP[char][good_chance]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.cast_finished IAC SE} {__gmcpReceivedCharCastFinished} {1};
+#ALIAS {__gmcpReceivedCharCastFinished} {
+    #NOP %0;
+    #VAR {GMCP[char][cast_finished]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.items IAC SE} {__gmcpReceivedCharItems} {1};
+#ALIAS {__gmcpReceivedCharItems} {
+    #NOP %0;
+    #VAR {GMCP[char][items]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP char.items.reagents IAC SE} {__gmcpReceivedCharItemsReagents} {1};
+#ALIAS {__gmcpReceivedCharItemsReagents} {
+    #NOP %0;
+    #VAR {GMCP[char][items][reagents]} {%1};
+};
+
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__gmcpReceivedRoomInfo} {1};
+#ALIAS {__gmcpReceivedRoomInfo} {
+    #NOP %0;
+    #VAR {GMCP[room][info]} {%1};
+};
+
+#CLASS {gmcp} {CLOSE};

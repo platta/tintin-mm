@@ -1,0 +1,135 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Automatically drop/sacrifice junk items;
+#NOP --------------------------------------------------------------------------;
+#CLASS {autosac} {OPEN};
+
+#NOP Automatically sacrifice severed limbs.;
+#VARIABLE {AUTOSAC_SEVERED} {1};
+
+#NOP Automatically sacrifice junk retrieved from corpses.;
+#VARIABLE {AUTOSAC_JUNK} {1};
+#VARIABLE {AUTOSAC_JUNK_LIST} {};
+
+#NOP Automatically drop junk, but don't sacrifice.;
+#VARIABLE {AUTOSAC_DROP} {1};
+#VARIABLE {AUTOSAC_DROP_LIST} {};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Toggle automatic sacrifice of severed limbs.;
+#ALIAS {_autosacToggleSevered} {
+    #IF {$AUTOSAC_SEVERED} {
+        #VARIABLE {AUTOSAC_SEVERED} {0};
+        _info {Automatic sacrifice of severed limbs is now OFF};
+    }; #ELSE {
+        #VARIABLE {AUTOSAC_SEVERED} {1};
+        _info {Automatic sacrifice of severed limbs is now ON};
+    };
+};
+
+#NOP Toggle automatically sacrificing items in the junk list.;
+#ALIAS {_autosacToggleJunk} {
+    #IF {$AUTOSAC_JUNK} {
+        #VARIABLE {AUTOSAC_JUNK} {0};
+        _info {Automatic sacrifice of junk items is now OFF};
+    }; #ELSE {
+        #VARIABLE {AUTOSAC_JUNK} {1};
+        _info {Automatic sacrifice of junk items is now ON};
+    };
+};
+
+#NOP Toggle automatically dropping items in the drop list.;
+#ALIAS {_autosacToggleDrop} {
+    #IF {$AUTOSAC_DROP} {
+        #VARIABLE {AUTOSAC_DROP} {0};
+        _info {Automatic drop of junk items is now OFF};
+    }; #ELSE {
+        #VARIABLE {AUTOSAC_DROP} {1};
+        _info {Automatic drop of junk items is now ON};
+    };
+};
+
+#NOP Add an item to the junk list for sacrificing.;
+#NOP %1 - Item long description;
+#ALIAS {_autosacJunk} {
+    #IF {&AUTOSAC_JUNK_LIST[%1]} {
+        _warn {'%1' is already on the junk list};
+    };
+    #VARIABLE {AUTOSAC_JUNK_LIST[%1]} {};
+    _info {'%1' is now junk};
+};
+
+#NOP Remove an item from the junk list for sacrificing.;
+#NOP %1 - Item long description;
+#ALIAS {_autosacUnjunk} {
+    #IF {!&AUTOSAC_JUNK_LIST[%1]} {
+        _warn {'%1' not found on the junk list};
+        #RETURN;
+    };
+    #UNVARIABLE {AUTOSAC_JUNK_LIST[%1]};
+    _info {'%1' is no longer on the junk list};
+};
+
+#NOP Add an item to the drop list.;
+#NOP %1 - Item long description;
+#ALIAS {_autosacDrop} {
+    #IF {&AUTOSAC_DROP_LIST[%1]} {
+        _warn {'%1' is already on the drop list};
+        #RETURN;
+    };
+    #VARIABLE {AUTOSAC_DROP_LIST[%1]} {};
+    _info {'%1' is now on the drop list};
+};
+
+#NOP Remove an item from the drop list.;
+#NOP %1 - Item long description;
+#ALIAS {_autosacUndrop} {
+    #IF {!&AUTOSAC_DROP_LIST[%1]} {
+        _warn {'%1' not found on the drop list};
+        #RETURN;
+    };
+    #UNVARIABLE {AUTOSAC_DROP_LIST[%1]};
+    _info {'%1' is no longer on the drop list};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Actions.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Handle sacrificing severed limbs.;
+#ALIAS {_autosacSeveredHandler} {
+    #NOP %0;
+    #IF {$AUTOSAC_SEVERED} {
+        sacrifice %1;
+    };
+};
+
+#NOP Handle dropping/sacrificing loot.;
+#ALIAS {_autosacLootHandler} {
+    #NOP %0;
+    #IF {$AUTOSAC_JUNK && &AUTOSAC_JUNK_LIST[%1] > 0} {
+        #LOCAL {i} {};
+        #LOOP {1} {%2} {i} {
+            #DELAY {0.05 * $i} {
+                drop "%1";
+                sacrifice "%1";
+            };
+        };
+      }; #ELSEIF {$AUTOSAC_DROP && &AUTOSAC_DROP_LIST[%1] > 0} {
+        #LOCAL {i} {};
+        #LOOP {1} {%2} {i} {
+            #DELAY {0.05 * $i} {
+                drop "%1";
+            };
+        };
+      };
+};
+
+#ACTION {The severed %1 of %2 falls to the ground.} {_autosacSeveredHandler {%1};};
+#ACTION {The severed %1 of %2 plops in the water.} {_autosacSeveredHandler {%1};};
+#ACTION {You take %1 from the corpse of %2.} {_autosacLootHandler {%1} {1};} {5};
+#ACTION {You take %+1..5d of %2 from the corpse of %3.} {_autosacLootHandler {%2} {%1};} {1};
+
+#CLASS {autosac} {CLOSE};

@@ -1,0 +1,835 @@
+#NOP --------------------------------------------------------------------------;
+#NOP MM Mapper class.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {mapper} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Variables.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Flag to indicate if we're in the wilderness or not.;
+#VARIABLE {MAPPER_IN_WILDERNESS} {0};
+
+#NOP Flag to indicate if we're watting for a prompt.;
+#VARIABLE {MAPPER_AWAITING_PROMPT} {0};
+
+#NOP Flag to indicate if we're in "manual" mapping mode.;
+#VARIABLE {MANUAL_MAP_MODE} {0};
+
+#NOP Stack of previous room numbers for fast travel.;
+#VARIABLE {PREVIOUS_LOCATIONS} {};
+
+#NOP Enable or disable click-to-walk.;
+#VARIABLE {CLICK_TO_WALK} {0};
+
+#NOP Map weights for various terrains.;
+#NOP This helps the mapper calculate better paths (i.e. it'll prefer roads).;
+#VARIABLE {TERRAIN_WEIGHT} {
+    {paved road} {0.005}
+    {city street} {0.005}
+    {craggy mountain} {10}
+    {deep water} {50}
+    {dense forest} {10}
+    {fresh-water-swimmable} {50}
+    {jungle} {10}
+    {light forest} {5}
+    {mountainous} {25}
+    {rocky ground} {10}
+    {salt water} {50}
+    {shallow water} {50}
+    {stream} {50}
+    {underwater} {50}
+};
+
+#NOP Colors that Materia Magica has as macros.;
+#VARIABLE {COLORS} {
+    {|B} {<bbf>}
+    {|b} {<aad>}
+    {|C} {<bff>}
+    {|c} {<aee>}
+    {|D} {<bbb>}
+    {|G} {<bfb>}
+    {|g} {<ada>}
+    {|I|W} {<fff>}
+    {|M} {<faf>}
+    {|m} {<dad>}
+    {|R} {<faa>}
+    {|r} {<daa>}
+    {|W} {<fff>}
+    {|w} {<ddd>}
+    {|Y} {<eea>}
+    {|y} {<dda>}
+    {|X} {<ddd>}
+};
+
+#NOP Shop description lookup table.;
+#VARIABLE {SHOP_DESC} {
+    {W} {weapon shop}
+    {M} {magic shop}
+    {A} {armor shop}
+    {I} {inn}
+    {H} {healer}
+    {T} {tavern}
+    {G} {general store}
+    {P} {post office}
+    {B} {blacksmith}
+    {$} {bank}
+};
+
+#NOP Trainer description lookup table.;
+#VARIABLE {TRAINER_DESC} {
+    {W} {weapon trainer}
+    {M} {magic trainer}
+};
+
+#NOP Holds room data to be sent to the wilderness database.;
+#VARIABLE {MAPPER_ROOM_DATA} {};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Shortcut for finding a room by its description and moving there.;
+#NOP %1 - Room description to search.;
+#ALIAS {_go} {
+    #NOP %0;
+    #LINE QUIET {#MAP {FIND} {} {} {%1}};
+    #LOCAL {length} {};
+    #PATH {GET} {LENGTH} {length};
+
+    #IF {$length == 0} {
+        _warn {GMCP Mapper: Not found or already there};
+        #PATH {DESTROY};
+    }; #ELSEIF {$length <= 100} {
+        _here;
+        #PATH {RUN};
+    }; #ELSE {
+        _warn {GMCP Mapper: Room is too far away (> 100 rooms)};
+        #PATH {DESTROY};
+    };
+};
+
+#NOP Make the current room a house.;
+#ALIAS {_house} {
+    #NOP %0;
+    #MAP {SET} {ROOMCOLOR} {<048>};
+};
+
+#NOP Make the current room a shop.;
+#NOP %1 - Symbol;
+#NOP %2 - Description (if no default);
+#ALIAS {_shop} {
+    #NOP %0;
+    #MAP {SET} {ROOMCOLOR} <168>;
+    #MAP {SET} {ROOMSYMBOL} {%1};
+
+    #IF {&SHOP_DESC[%1]} {
+        #MAP {SET} {ROOMDESC} {$SHOP_DESC[%1]};
+    }; #ELSE {
+        #IF {"%2" != ""} {
+            #MAP {SET} {ROOMDESC} {%2};
+        }; #ELSE {
+            _warn {GMCP Mapper: No room description for symbol '%1' and no description given};
+        };
+    };
+};
+
+
+#NOP Make the current room a trainer.;
+#NOP %1 - Symbol;
+#NOP %2 - Description (if no default);
+#ALIAS {_trainer} {
+    #NOP %0;
+    #MAP {SET} {ROOMCOLOR} {<158>};
+    #MAP {SET} {ROOMSYMBOL} {%1};
+
+    #IF {&TRAINER_DESC[%1]} {
+        #MAP {SET} {ROOMDESC} {$TRAINER_DESC[%1]};
+    }; #ELSE {
+        #IF {"%2" != ""} {
+            #MAP {SET} {ROOMDESC} {%2};
+        }; #ELSE {
+            _warn {GMCP Mapper: No room description for symbol '%1' and no description given};
+        };
+    };
+};
+
+#NOP Make the current room a quest-giver.;
+#ALIAS {_quest} {
+    #NOP %0;
+    #MAP {SET} {ROOMCOLOR} <138>;
+    #MAP {SET} {ROOMSYMBOL} {Q};
+};
+
+#NOP Shorthand for hiding map exits.;
+#NOP %1 - Direction;
+#ALIAS {_hide} {
+    #NOP %0;
+    #MAP {EXITFLAG} {%1} {HIDE};
+};
+
+#NOP Map an unreachable room.;
+#NOP Digs east or west and sets up a dummy room.;
+#NOP %1 Room color.;
+#NOP %2 Room symbol.;
+#NOP %3 {w} to dig west, otherwise we dig east.;
+#ALIAS {_wall} {
+    #NOP %0;
+    #NOP Get properties of current room.;
+    #LOCAL {vnum} {};
+    #LOCAL {roomdata} {};
+    #LOCAL {newVnum} {};
+    #LOCAL {newX} {};
+    #MAP GET {roomvnum} {vnum};
+    #MAP GET {roomdata} {currentRoom};
+
+    #NOP Get the new vnum.;
+    #IF {"%3" == "w"} {
+        #LOCAL {dir} {w};
+        #MATH {newVnum} {$vnum - 1};
+        #MATH {newX} {$room[gmcp][coord][x] - 1};
+    }; #ELSE {
+        #LOCAL {dir} {e};
+        #MATH {newVnum} {$vnum + 1};
+        #MATH {newX} {$room[gmcp][coord][x] + 1};
+    };
+
+    #NOP Create, link, and go to the new room.;
+    #MAP {DIG} {$dir} {$newVnum};
+    #MAP {LINK} {$dir} {$newVnum} {BOTH};
+    #MAP {EXITFLAG} {$dir} {BLOCK};
+    #MAP {GOTO} {$newVnum};
+
+    #NOP Translate room color.;
+    #LOCAL {color} {$COLORS[%1]};
+    #IF {"$color" == ""} {
+        _warn {GMCP Mapper: No color found for '%1'};
+        #LOCAL {color} {<fff>};
+    };
+
+    #NOP Set properties of the new room.;
+    #MAP {SET} {ROOMCOLOR} {$color};
+    #MAP {SET} {ROOMSYMBOL} {%2};
+    #MAP {SET} {ROOMAREA} {$room[gmcp][zone]};
+    #MAP {SET} {ROOMNAME} {FALSE ROOM};
+    #LOCAL {roomdata} {
+      {gmcp} {
+        {coord} {
+          {color} {%1}
+          {sym} {%2}
+          {x} {$newX}
+          {y} {$room[gmcp][coord][y]}
+        }
+        {name} {FALSE ROOM}
+        {num} {$newVnum}
+        {wilds} {true}
+        {zone} {$room[gmcp][zone]}
+      }
+    };
+    #MAP {SET} {ROOMDATA} {$roomdata};
+};
+
+#NOP Move on the map but not in game.;
+#NOP %1 Direction to move;
+#ALIAS {_mapMove} {
+    #NOP %0;
+    #LOCAL {roomdata} {};
+    #MAP {GET} {ROOMDATA} {roomdata};
+    #IF {&roomdata[gmcp][exits][%1]} {
+        #MAP {GOTO} {$roomdata[gmcp][exits][%1]};
+    };
+};
+
+#NOP Alias all movement directions to moving the map without actually moving.;
+#ALIAS {_aliasMovement} {
+    #NOP %0;
+    #ALIAS {n} {_mapMove n};
+    #ALIAS {ne} {_mapMove ne};
+    #ALIAS {e} {_mapMove e};
+    #ALIAS {se} {_mapMove se};
+    #ALIAS {s} {_mapMove s};
+    #ALIAS {sw} {_mapMove sw};
+    #ALIAS {w} {_mapMove w};
+    #ALIAS {nw} {_mapMove nw};
+    #ALIAS {u} {_mapMove u};
+    #ALIAS {d} {_mapMove d};
+};
+
+#NOP Remove all movement aliases;
+#ALIAS {_unaliasMovement} {
+    #NOP %0;
+    #UNALIAS {n};
+    #UNALIAS {ne};
+    #UNALIAS {e};
+    #UNALIAS {se};
+    #UNALIAS {s};
+    #UNALIAS {sw};
+    #UNALIAS {w};
+    #UNALIAS {nw};
+    #UNALIAS {u};
+    #UNALIAS {d};
+};
+
+#NOP Read the map from file.;
+#ALIAS {_mapperReadMap} {
+    #NOP %0;
+    #MAP READ {$__base/game.mm/gmcp.map};
+};
+
+#NOP Write the map to file.;
+#ALIAS {_mapperWriteMap} {
+    #NOP %0;
+    #MAP WRITE {$__base/game.mm/gmcp.map};
+};
+
+#NOP Event handler for receiving room info.;
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
+#ALIAS {__mapperReceivedRoomInfo} {
+    #NOP %0;
+    #NOP Go to or create room.;
+    #IF {!@__mapperGoToNewRoom{}} {
+        #NOP not a real room, don't touch anything else.;
+        #RETURN;
+    };
+
+    #NOP Update exits.;
+    __mapperUpdateExits;
+
+    #NOP Update room properties.;
+    __mapperUpdateRoomProperties;
+
+    #NOP Update graphics mode.;
+    __mapperUpdateGraphicsMode;
+
+    #IF {$MAPPER_IN_WILDERNESS} {
+        #VARIABLE {MAPPER_AWAITING_PROMPT} {1};
+    };
+};
+
+#NOP Set the graphics mode to fit the type of room we're in.;
+#ALIAS {__mapperUpdateGraphicsMode} {
+    #NOP %0;
+    #IF {&GMCP[room][info][coord][sym]} {
+        #NOP In the wilderness.;
+        #VARIABLE {MAPPER_IN_WILDERNESS} {1};
+        #MAP {FLAG} {SYMBOLGRAPHICS} {ON};
+        #MAP {FLAG} {FAST} {ON};
+
+        #NOP Disable click to walk.;
+        #VARIABLE {CLICK_TO_WALK} {0};
+    }; #ELSE {
+        #NOP Not wilderness.;
+        #VARIABLE {MAPPER_IN_WILDERNESS} {0};
+        #MAP {FLAG} {ASCIIGRAPHICS} {ON};
+        #MAP {FLAG} {FAST} {OFF};
+
+        #NOP Enable click to walk.;
+        #VARIABLE {CLICK_TO_WALK} {1};
+    };
+};
+
+#NOP Go to or create a new room based on the contents of the GMCP data.;
+#FUNCTION {__mapperGoToNewRoom} {
+    #IF {$GMCP[room][info][num] < 0} {
+        #NOP The room isn't a real room. If we're doing manual mapping, we can;
+        #NOP ignore that, because a new room will already have been created. ;
+        #NOP Otherwise, just return out of here.;
+        #IF {!$MANUAL_MAP_MODE} {
+            _warn {GMCP Mapper: Not a real room};
+            #RETURN 0;
+        };
+    }; #ELSE {
+        #NOP Go to or create room.;
+        #MAP {GOTO} {$GMCP[room][info][num]} {DIG};
+    };
+
+    #RETURN 1;
+};
+
+#NOP Update the mapper's exits for a room.;
+#ALIAS {__mapperUpdateExits} {
+    #NOP %0;
+    #LOCAL {gmcpExit} {};
+    #LOCAL {mapperExits} {};
+    #LOCAL {mapperVnum} {};
+
+    #NOP We are in the room we're updating. Get the list of exits the map;
+    #NOP already knows about.;
+    #MAP {GET} {ROOMEXITS} {mapperExits};
+
+    #NOP Now loop through the exits in the GMCP data to update the map.;
+    #FOREACH {*GMCP[room][info][exits][]} {gmcpExit} {
+        #NOP Can't handle doors.;
+        #IF {"$gmcpExit" == "door"} {
+            #CONTINUE;
+        };
+
+        #NOP Don't do anything with fake rooms.;
+        #IF {$GMCP[room][info][exits][$gmcpExit] < 0} {
+            #CONTINUE;
+        };
+
+        #NOP Mapper doesn't know about this exit. Create it.;
+        #IF {!&mapperExits[$gmcpExit]} {
+            #NOP Check if the room exists or not before we dig.;
+            #MAP {GET} {ROOMVNUM} {mapperVnum} {$GMCP[room][info][exits][$gmcpExit]};
+
+            #MAP {DIG} {$gmcpExit} {$GMCP[room][info][exits][$gmcpExit]};
+            #IF {$mapperVnum == 0}
+            {
+                #NOP Mark unexplored rooms red.;
+                #MAP {SET} {ROOMCOLOR} {<118>} {$GMCP[room][info][exits][$gmcpExit]}
+            }
+        }
+    };
+};
+
+#NOP Update room properties in the mapper.;
+#ALIAS {__mapperUpdateRoomProperties} {
+    #NOP %0;
+    #NOP Check if the area has been set. If not, assume this is the first time;
+    #NOP we've visited this room. The room may have just been created when we;
+    #NOP landed in it, or might have been created as a stub when we entered an;
+    #NOP adjacent room.;
+    #LOCAL {is_existing} {};
+    #MAP {GET} {ROOMAREA} {is_existing};
+    #MATH {is_existing} {"$is_existing" != ""};
+
+    #NOP Store all the gmcp room data in the room's INFO property.;
+    #LOCAL {roomData} {};
+    #MAP {GET} {ROOMDATA} {roomData};
+    #VARIABLE {roomData[gmcp]} {$GMCP[room][info]};
+    #MAP {SET} {ROOMDATA} {$roomData};
+
+    #NOP Only mess with room color if this is a new room.;
+    #IF {!$is_existing} {
+        #NOP Automatically set room color if you're indoors.;
+        #IF {"$GMCP[room][info][terrain]" == "indoors"} {
+            #MAP {SET} {ROOMCOLOR} <148>;
+        }; #ELSE {
+            #NOP This makes sure we kill the red color used for stub rooms.;
+            #MAP {SET} {ROOMCOLOR} <178>;
+        };
+    };
+
+    #NOP Always update these properties.;
+    #IF {$GMCP[room][info][num] < 0} {
+        #NOP Apply a special area to fake rooms so they can be easily deleted.;
+        #MAP {SET} {ROOMAREA} {FAKE};
+    }; #ELSE {
+        #MAP {SET} {ROOMAREA} {$GMCP[room][info][zone]};
+    };
+    #MAP {SET} {ROOMNOTE} {$GMCP[room][info][environment]};
+    #MAP {SET} {ROOMNAME} {$GMCP[room][info][name]};
+    #MAP {SET} {ROOMINFO} {$GMCP[room][info][details]};
+
+    #NOP Only set terrain if it isn't custom. all custom terrains should be;
+    #NOP prefixed with "c_" so the mapper doesn't overwrite them.;
+    #LOCAL {terrain} {};
+    #MAP {GET} {ROOMTERRAIN} {terrain};
+    #FORMAT {terrain} {%.2s} {$terrain};
+    #IF {"$terrain" != "c_"} {
+        #MAP {SET} {ROOMTERRAIN} {$GMCP[room][info][terrain]};
+    };
+
+    #NOP Set room weight.;
+    #IF {"$TERRAIN_WEIGHT[$GMCP[room][info][terrain]]" != ""} {
+        #MAP {SET} {ROOMWEIGHT} {$TERRAIN_WEIGHT[$GMCP[room][info][terrain]]};
+    };
+
+    #IF {&GMCP[room][info][coord][sym]} {
+      #NOP If this is a wilderness room.;
+      #NOP Set a custom terrain based on the symbol.;
+      #MAP {SET} {ROOMTERRAIN} {w_$GMCP[room][info][coord][color]$GMCP[room][info][coord][sym]};
+
+      #NOP Create or update the actual terrain in the mapper.;
+      #MAP {TERRAIN} {w_$GMCP[room][info][coord][color]$GMCP[room][info][coord][sym]} {$COLORS[$GMCP[room][info][coord][color]]$GMCP[room][info][coord][sym]<088>} {DENSE};
+
+      #NOP Set the room properties.;
+      #MAP {SET} {ROOMCOLOR} {$COLORS[$GMCP[room][info][coord][color]]};
+      #MAP {SET} {ROOMSYMBOL} {$GMCP[room][info][coord][sym]};
+
+      #NOP Special case for blanks.;
+      #IF {"$GMCP[room][info][coord][color]" == "|X" && "$GMCP[room][info][coord][sym]" == " "} {
+        #MAP {SET} {ROOMCOLOR} {<aaa>};
+      };
+    }; #ELSE {
+      #NOP Not a wilderness room.;
+      #NOP Ensure we create a terrain if one doesn't exist.;
+      #LINE QUIET #LINE CAPTURE {terrain} {#MAP {TERRAIN} {$GMCP[room][info][terrain]}};
+      #IF {"$terrain" == ""} {
+        #MAP {TERRAIN} {$GMCP[room][info][terrain]} { };
+      };
+    };
+};
+
+#NOP Save your current location to return later.;
+#ALIAS {_here} {
+    #NOP %0;
+    #LOCAL {vnum} {};
+    #MAP GET {ROOMVNUM} {vnum};
+
+    #LIST {PREVIOUS_LOCATIONS} {INSERT} {1} {$vnum};
+
+    #IF {&PREVIOUS_LOCATIONS[] > 100} {
+        #LIST {PREVIOUS_LOCATIONS} {DELETE} {-1};
+    };
+
+    _info {GMCP Mapper: Location recorded};
+  };
+
+#NOP Return to your saved place.;
+#ALIAS {_return} {
+    #NOP %0;
+    #LOCAL {vnum} {};
+    #LIST {PREVIOUS_LOCATIONS} {GET} {1} {vnum};
+
+    #IF {$vnum > 0} {
+        #MAP {FIND} {$vnum};
+        #LOCAL {length} {};
+        #PATH {GET} {LENGTH} {length};
+        #IF {$length <= 100} {
+            #LIST {PREVIOUS_LOCATIONS} {DEL} {1};
+            #IF {$length == 0} {
+                _warn {GMCP Mapper: Not found or already there};
+            }; #ELSE {
+                #PATH {RUN};
+            };
+        }; #ELSE {
+            #PATH {DESTROY};
+            _warn {GMCP Mapper: Previous location too far away (> 100 rooms)};
+        };
+    }; #ELSE {
+        _warn {GMCP Mapper: No location to return to};
+    };
+};
+
+#NOP Enter one of the mazes that is randomized.;
+#NOP Call this when you're in the last real room before the maze.;
+#NOP %1 - direction to move to enter the maze.;
+#ALIAS {_enterUnknown} {
+    #NOP %0;
+    #LOCAL {exits} {};
+    #MAP {GET} {ROOMEXITS} {exits};
+    #IF {&exits[%1] == 0} {
+        #NOP Create a new dummy room in the specified direction.;
+        #MAP {DIG} {%1} {NEW};
+
+        #NOP Get the vnum of that room.;
+        #MAP {GET} {ROOMEXITS} {exits};
+        #LOCAL {vnum} {$exits[%1]};
+
+        #MAP {SET} {ROOMAREA} {FAKE} {$vnum};
+        #MAP {SET} {ROOMDESC} {unknownexit} {$vnum};
+    };
+
+    #VARIABLE {MANUAL_MAP_MODE} {1};
+    #MAP {FLAG} {NOFOLLOW} {OFF};
+    #MAP {FLAG} {STATIC} {OFF};
+};
+
+#NOP Stop operating in manual mapping mode.;
+#ALIAS {_exitUnknown} {
+    #NOP %0;
+    #VARIABLE {MANUAL_MAP_MODE} {0};
+    #MAP {FLAG} {NOFOLLOW} {ON};
+    #MAP {FLAG} {STATIC} {ON};
+};
+
+#NOP Destroy all rooms created for randomized maze areas.;
+#ALIAS {_destroyUnknown} {
+    #NOP %0;
+    #MAP {DESTROY} {AREA} {FAKE};
+};
+
+_eventHandlerRegister {MAP ROOM SHORT-CLICKED MOUSE BUTTON ONE} {_mapperMapClicked};
+#NOP Handle map clicks.;
+#ALIAS {_mapperMapClicked} {
+    #NOP %0;
+    #IF {$CLICK_TO_WALK} {
+        #MAP {FIND} {%5};
+        #PATH {RUN};
+    };
+};
+
+_panelCreate {map} {MAP};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Events.;
+#NOP --------------------------------------------------------------------------;
+
+_eventHandlerRegister {SESSION DISCONNECTED} {_mapperWriteMap};
+
+_eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
+#ALIAS {_mapperReceivedPrompt} {
+    #NOP %0;
+    #IF {$MAPPER_AWAITING_PROMPT} {
+        #VARIABLE {MAPPER_AWAITING_PROMPT} {0};
+        #LOCAL {foo} {@_mapperFindCircle{}};
+
+
+    };
+};
+
+#FUNCTION {_mapperFindCircle} {
+    #NOP Figure out where the top of the map circle is.;
+    #LOCAL {mapTop} {0};
+
+    #NOP If we just entered a room, look for the line that's part of the;
+    #NOP room header.;
+    #LOCAL {roomLine} {0};
+    #BUFFER {FIND} {%!{^\e\[[0-9;]*m\(-{46}\e\[0m\e\[[0-9;]*m---\)}} {roomLine};
+
+    #NOP If we just did ship scan, look for the crow's nest message.;
+    #LOCAL {shipScanLine} {0};
+    #BUFFER {FIND} {You climb up to the crow's nest of} {shipScanLine};
+
+    #IF {$roomLine > $shipScanLine} {
+        #NOP If the room line is the most recent one, the map either starts;
+        #NOP 2 or 3 lines below, depending on whether or not you have;
+        #NOP superbrief turned on.;
+        #MATH {mapTop} {$roomLine + 2};
+
+        #NOP Check for a potential extra line. If you have superbrief;
+        #NOP turned on, it won't be there. Otherwise, it will.;
+        #LOCAL {mapCheck} {};
+        #BUFFER {GET} {mapCheck} {$mapTop};
+        #IF {"$mapCheck" === ""} {
+            #MATH {mapTop} {$mapTop + 1};
+        };
+    }; #ELSE {
+        #NOP If the ship scan line is the most recent one, the map starts;
+        #NOP on the next line.;
+        #MATH {mapTop} {$shipScanLine + 1};
+    };
+
+    #NOP Now we know where the top is. Start at the top and scan downards.;
+    #LOCAL {bufferInfo} {};
+    #BUFFER {INFO} {SAVE} {bufferInfo};
+    #LOCAL {bottomLine} {$bufferInfo[USED]};
+
+    #LOCAL {lineLengths} {};
+    #LOCAL {linesAtThisLength} {1};
+    #LOCAL {increasing} {1};
+
+    #LOCAL {i} {};
+    #LOOP {$mapTop} {$bottomLine} {i} {
+        #NOP Get the actual contents of the current line.;
+        #LOCAL {line} {};
+        #BUFFER {GET} {line} {$i};
+
+        #IF {$increasing} {
+            #NOP We are at the part where the circle is increasing in size.;
+            #LOCAL {currentLineLength} {};
+            #FORMAT {currentLineLength} {%L} {$line};
+            #IF {&lineLengths[] > 0 && $lineLengths[-1] > $currentLineLength} {
+                #NOP We hit the first line that's decreasing in width.;
+                #LOCAL {increasing} {0};
+
+                #NOP The previous line is the maximum width we expect to see.;
+                #NOP See how many lines we just saw at that maximum width. It;
+                #NOP should be an odd number. If not, quit. Also, the length of;
+                #NOP those longest lines should be odd. If not, also quit.;
+                #IF {$linesAtThisLength % 2 == 0 || $lineLengths[-1] % 2 == 0} {
+                    #RETURN {0};
+                };
+
+                #LOCAL {mapCenter} {};
+                #LOCAL {mapBottom} {};
+                #LOCAL {mapHeight} {};
+                #LOCAL {mapWidth} {};
+                #MATH {mapCenter} {$i - 1 - ($linesAtThisLength - 1) / 2};
+                #MATH {mapBottom} {$mapTop + ($mapCenter - $mapTop) * 2};
+                #MATH {mapHeight} {$mapBottom - $mapTop + 1};
+                #MATH {mapWidth} {$lineLengths[-1]}
+            };
+
+            #NOP While we're working on finding the center, have to keep track;
+            #NOP of the number of lines we've seen at the length of this line.;
+            #IF {&lineLengths[] && $lineLengths[-1] == $currentLineLength} {
+                #MATH {linesAtThisLength} {$linesAtThisLength + 1};
+            }; #ELSE {
+                #LOCAL {linesAtThisLength} {1};
+            };
+        }; #ELSE {
+            #NOP We are at the part where the circle is decreasing in size.;
+
+            #NOP Since we already saw the center, we know where the bottom;
+            #NOP should be, and that's where we'll stop. We're really only;
+            #NOP continuing just to make sure things look as expected.;
+            #IF {$i == $mapBottom} {
+                #BREAK;
+            };
+
+            #NOP Match the current line with its corresponding mirror across;
+            #NOP the center line. The lengths should match. If not, quit.;
+            #IF {$currentLineLength != $lineLengths[$mapBottom - $i + 1]} {
+                #RETURN {0};
+            };
+        };
+
+        #NOP Capture the length of this line.;
+        #LIST {lineLengths} {INSERT} {-1} {$currentLineLength};
+    };
+
+    #NOP Find the line in the center of the map circle, vertically. The length;
+    #NOP of that line tells us the width of the map circle.;
+    #LOCAL {centerLine} {};
+    #LOCAL {centerCol} {};
+    #MATH {centerLine} {($mapHeight - 1) / 2 + 1};
+    #MATH {centerCol} {($mapWidth - 1) / 2 + 1};
+
+    #NOP Using the sextant coords from GMCP, calculate the sextant coords of;
+    #NOP the top and left of the map circle.;
+    #LOCAL {sextantTop} {};
+    #LOCAL {sextantLeft} {};
+    #MATH {sextantTop} {$GMCP[room][info][coord][y] - ($mapHeight - 1) / 2};
+    #MATH {sextantLeft} {$GMCP[room][info][coord][x] - ($mapWidth - 1) / 2};
+
+    #VARIABLE {MAPPER_ROOM_DATA} {};
+    #VARIABLE {MAPPER_DEBUG_DATA} {};
+
+    #NOP Now, loop through the rows and capture the map data.;
+    #LOOP {0} {$mapHeight - 1} {i} {
+        #NOP Buffer line number.;
+        #LOCAL {lineNumber} {};
+        #MATH {lineNumber} {$mapTop + $i};
+
+        #NOP Sextant Y coordinate.;
+        #LOCAL {mapY} {};
+        #MATH {mapY} {$sextantTop + $i};
+        #LOCAL {mapX} {$sextantLeft};
+
+        #NOP Get this line of the buffer.;
+        #LOCAL {line} {};
+        #BUFFER {GET} {line} {$lineNumber};
+
+
+        #NOP TODO: Deal with these...;
+        #REPLACE {line} {\x7B} { };
+        #REPLACE {line} {\x7D} { };
+        #LIST {MAPPER_DEBUG_DATA} {ADD} {$line};
+
+
+
+        #LOCAL {escape} {0};
+        #LOCAL {escapeChars} {};
+        #LOCAL {color} {0};
+
+        #LOCAL {char} {};
+        #PARSE {$line} {char} {
+            #IF {$escape} {
+                #IF {"$char" === "m"} {
+                    #NOP "m" signals the end of the escape.;
+                    #NOP Set the current color value here.;
+                    #IF {&MAPPER_DB_COLOR_MAP[$escapeChars]} {
+                        #LOCAL {color} {$MAPPER_DB_COLOR_MAP[$escapeChars]};
+                    }; #ELSE {
+                        #LOCAL {color} {12632256};
+                        _warn {Unknown color code $escapeChars};
+                    };
+
+                    #LOCAL {escape} {0};
+                    #LOCAL {escapeChars} {};
+                    #CONTINUE;
+                }; #ELSE {
+                    #NOP Collect escaped characters.;
+                    #LOCAL {escapeChars} {$escapeChars$char};
+                };
+            }; #ELSE {
+                #NOP Detect beginning of escape sequence;
+                #IF {"$char" == "\e"} {
+                    #LOCAL {escape} {1};
+                    #CONTINUE;
+                };
+
+                #NOP Only capture if there is a character.;
+                #IF {"$char" !== " "} {
+                    #IF {$mapY == $GMCP[room][info][coord][y] and $mapX == $GMCP[room][info][coord][x]} {
+                        #LIST {MAPPER_ROOM_DATA} {ADD} {
+                            {zone} {$GMCP[room][info][zone]}
+                            {color} {$MAPPER_DB_CODE_MAP[$GMCP[room][info][coord][color]]}
+                            {symbol} {$GMCP[room][info][coord][sym]}
+                            {x} {$GMCP[room][info][coord][x]}
+                            {y} {$GMCP[room][info][coord][y]}
+                        };
+
+                        #NOP Store drawn data for current room.;
+                        #VARIABLE {MAPPER_CURRENT_ROOM_COLOR} {$color};
+                        #VARIABLE {MAPPER_CURRENT_ROOM_SYMBOL} {$char};
+                    }; #ELSE {
+                        #LIST {MAPPER_ROOM_DATA} {ADD} {
+                            {zone} {$GMCP[room][info][zone]}
+                            {color} {$color}
+                            {symbol} {$char}
+                            {x} {$mapX}
+                            {y} {$mapY}
+                        };
+                    };
+                };
+
+                #NOP Advance the X coordinate.;
+                #MATH {mapX} {$mapX + 1};
+            };
+        };
+    };
+};
+
+#VARIABLE {MAPPER_DB_CODE_MAP} {
+    {|B"} {16711680}
+    {|R"} {255}
+    {|C"} {16776960}
+    {|M"} {16711935}
+    {|Y"} {65535}
+    {|W"} {16777215}
+    {|I|W"} {16777215}
+    {|G"} {65280}
+    {|b"} {8388608}
+    {|r"} {128}
+    {|c"} {8421376}
+    {|m"} {8388736}
+    {|y"} {32896}
+    {|w"} {12632256}
+    {|g"} {32768}
+    {|D"} {8421504}
+    {|X"} {12632256}
+};
+
+#NOP This maps the escape codes for colors to the numeric values we need for;
+#NOP the database.;
+#VARIABLE {MAPPER_DB_COLOR_MAP} {
+    {[0;38;5;12} {16711680}
+    {[0;38;5;9} {255}
+    {[0;38;5;14} {16776960}
+    {[0;38;5;13} {16711935}
+    {[0;38;5;11} {65535}
+    {[0;38;5;15} {16777215}
+    {[0;38;5;10} {65280}
+    {[0;38;5;4} {8388608}
+    {[0;38;5;1} {128}
+    {[0;38;5;6} {8421376}
+    {[0;38;5;5} {8388736}
+    {[0;38;5;3} {32896}
+    {[0;38;5;7} {12632256}
+    {[0;38;5;2} {32768}
+    {[0;38;5;8} {8421504}
+    {[38;5;12} {16711680}
+    {[38;5;9} {255}
+    {[38;5;14} {16776960}
+    {[38;5;13} {16711935}
+    {[38;5;11} {65535}
+    {[38;5;15} {16777215}
+    {[38;5;10} {65280}
+    {[38;5;4} {8388608}
+    {[38;5;1} {128}
+    {[38;5;6} {8421376}
+    {[38;5;5} {8388736}
+    {[38;5;3} {32896}
+    {[38;5;7} {12632256}
+    {[38;5;2} {32768}
+    {[38;5;8} {8421504}
+    {[0} {12632256}
+};
+
+
+#CLASS {mapper} {CLOSE};

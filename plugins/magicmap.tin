@@ -1,0 +1,48 @@
+#NOP Class for feeding data to OOC MagicMap.;
+#CLASS {magicmap} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Send data to Magic Map.;
+#NOP %1 - The name of the GMCP event.;
+#NOP %2 - The GMCP payload.;
+#ALIAS {_magicMapSend} {
+    #NOP %0;
+    #LOCAL {sessionName} {magicmap.@__characterName{}};
+    #NOP Ensure session exists. Should fail silently if it's already there.;
+    #LINE BACKGROUND {#LINE QUIET {#SESSION {$sessionName} {ooc.dune.net} {5200};};};
+
+    #NOP %2 will be the value from GMCP. Turn it into JSON.;
+    #LOCAL {payload} {%2};
+    #LINE {JSON} {payload} {#VARIABLE {__json} &0;};
+
+    #NOP Strip newlines and extra space.;
+    #REPLACE {__json} {\n%s} {};
+    #REPLACE {__json} {" : "} {":"};
+
+    #NOP Send to the magicmap session.;
+    #LINE {IGNORE} {#$sessionName {#SEND {%1 \x7B$__json\x7D};};};
+
+    #UNVARIABLE {__json};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Events.;
+#NOP --------------------------------------------------------------------------;
+
+_eventHandlerRegister {IAC SB GMCP char.vitals IAC SE} {_magicMapSend {char.vitals}};
+_eventHandlerRegister {IAC SB GMCP char.base IAC SE} {_magicMapSend {char.base}};
+_eventHandlerRegister {IAC SB GMCP char.maxstats IAC SE} {_magicMapSend {char.maxstats}};
+_eventHandlerRegister {IAC SB GMCP char.stats IAC SE} {_magicMapSend {char.stats}};
+_eventHandlerRegister {IAC SB GMCP char.status IAC SE} {_magicMapSend {char.status}};
+_eventHandlerRegister {IAC SB GMCP char.worth IAC SE} {_magicMapSend {char.worth}};
+_eventHandlerRegister {IAC SB GMCP char.clan IAC SE} {_magicMapSend {char.clan}};
+_eventHandlerRegister {IAC SB GMCP char.good_chance IAC SE} {_magicMapSend {char.good_chance}};
+_eventHandlerRegister {IAC SB GMCP char.cast_finished IAC SE} {_magicMapSend {char.cast_finished}};
+_eventHandlerRegister {IAC SB GMCP char.items IAC SE} {_magicMapSend {char.items}};
+_eventHandlerRegister {IAC SB GMCP char.items.reagents IAC SE} {_magicMapSend {char.items.reagents}};
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_magicMapSend {room.info}};
+
+#CLASS {magicmap} {CLOSE};

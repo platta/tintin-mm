@@ -1,0 +1,41 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Materia Magica event hooks class;
+#NOP ;
+#NOP Dependencies:;
+#NOP - logging;
+#NOP --------------------------------------------------------------------------;
+#CLASS {mmevents} {OPEN};
+
+#NOP Standard prompt;
+_eventRegister {PROMPT};
+_eventRegister {STANDARD PROMPT};
+#ACTION {^%!{.*}<{\d+}hp {\d+}sp {\d+}st> $} {
+    _eventFire {PROMPT};
+    #NOP %1 - hp;
+    #NOP %2 - sp;
+    #NOP %3 - st;
+    _eventFire {STANDARD PROMPT} {%1} {%2} {%3};
+};
+
+#NOP Boat prompt;
+_eventRegister {BOAT PROMPT};
+#ACTION {^%!{.*}({\d+}hull %+dir %+ %+wind%!{(?: (.+)\%shld)?}%!{(?: (.+), (.+))?}) $} {
+    _eventFire {PROMPT};
+    #NOP %1 - hull;
+    #NOP %2 - direction;
+    #NOP %3 - speed;
+    #NOP %4 - wind;
+    #NOP %5 - shield percent;
+    #NOP %6 - sextant latitude;
+    #NOP %7 - sextant longitude;
+    _eventFire {BOAT PROMPT} {%1} {%2} {%3} {%4} {%5} {%6} {%7};
+};
+
+#NOP Social prompt;
+_eventRegister {SOCIAL PROMPT};
+#ACTION {^(Social) $} {
+    _eventFire {PROMPT};
+    _eventFire {SOCIAL PROMPT};
+};
+
+#CLASS {mmevents} {CLOSE};

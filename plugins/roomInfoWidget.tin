@@ -1,0 +1,182 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Room widget;
+#NOP Shows the name, area, and terrain of the room as well as a mostly accurate;
+#NOP compass rose.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {roomInfoWidget} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Update widget data.;
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomInfoWidgetUpdate};
+#ALIAS {_roomInfoWidgetUpdate} {
+    #NOP %0;
+    _widgetUpdateData {roomInfoWidget} {
+        {info} {
+            {vnum} {$GMCP[room][info][num]}
+            {zone} {$GMCP[room][info][zone]}
+            {name} {$GMCP[room][info][name]}
+            {terraininfo} {$GMCP[room][info][terraininfo]}
+        }
+        {exits} {$GMCP[room][info][exits]}
+    };
+};
+
+#NOP Draw the widget.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_roomInfoWidgetDraw} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #NOP Minimum width to render the compass.;
+    #LOCAL {minWidthCompass} {48};
+
+    #NOP Calculate actual measurements.;
+    #LOCAL {top} {};
+    #MATH {top} {%2 + 1};
+    #LOCAL {left} {};
+    #MATH {left} {%3 + 1};
+    #LOCAL {bottom} {};
+    #MATH {bottom} {%4 - 1};
+    #LOCAL {right} {};
+    #MATH {right} {%5 - 1};
+
+    #LOCAL {width} {};
+    #MATH {width} {$right - $left + 1};
+
+    #DRAW {$BOX_COLOR} {$BOX_STYLE} {BOX} {%2} {%3} {%4} {%5};
+    #SCREEN {CLEAR} {SQUARE} {$top} {$left} {$bottom} {$right};
+
+    #IF {$width < $minWidthCompass} {
+        #NOP Too small to show compass.;
+        _roomInfoWidgetDrawInfo {$data[info]} {$top} {$left} {$bottom} {$right};
+    }; #ELSE {
+        _roomInfoWidgetDrawInfo {$data[info]} {$top} {$left} {$bottom} {$right - 16};
+        #DRAW {$BOX_COLOR} {$BOX_STYLE} {LINE} {$top - 1} {$right - 15} {$bottom + 1} {$right - 15};
+        _roomInfoWidgetDrawCompass {$data[exits]} {$top} {$right - 14} {$bottom} {$right};
+    };
+};
+
+#NOP Draw room info.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_roomInfoWidgetDrawInfo} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+    #LOCAL {width} {};
+    #MATH {width} {%5 - %3 + 1};
+    #LOCAL {zone} {@_stringTruncate{{$data[zone]}; {$width}}};
+    #LOCAL {name} {@_stringTruncate{{$data[name]}; {$width}}};
+    #LOCAL {terrain} {@_stringTruncate{{($data[vnum]) $data[terraininfo]}; {$width}}};
+
+    #LINE IGNORE #SHOWME {${PERSONAL_COLOR}$zone\e[0m} {%2} {%3};
+    #LINE IGNORE #SHOWME {\e[38;5;11m$name\e[0m} {%2 + 1} {%3};
+    #LINE IGNORE #SHOWME {${PERSONAL_COLOR}$terrain\e[0m} {%2 + 2} {%3};
+};
+
+#NOP Draw the compass.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_roomInfoWidgetDrawCompass} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #LOCAL {directionColor} {\e[0;38;5;11m};
+    #LOCAL {centerColor} {\e[0;38;5;13m};
+
+    #LOCAL {compass_1} {};
+    #NOP Line 1.;
+    #NOP Northwest.;
+    #IF {&data[nw]} {
+        #LOCAL {compass_1} {${directionColor}NW${CLEAR_COLOR}     };
+    }; #ELSE {
+        #LOCAL {compass_1} {${PERSONAL_COLOR}-${CLEAR_COLOR}      };
+    };
+
+    #NOP North.;
+    #IF {&data[n]} {
+        #LOCAL {compass_1} {$compass_1${directionColor}N${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_1} {$compass_1${PERSONAL_COLOR}-${CLEAR_COLOR}};
+    };
+
+    #NOP Northeast.;
+    #IF {&data[ne]} {
+        #LOCAL {compass_1} {$compass_1     ${directionColor}NE${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_1} {$compass_1      ${PERSONAL_COLOR}-${CLEAR_COLOR}};
+    };
+
+    #NOP Line 2.;
+    #NOP West.;
+    #IF {&data[w]} {
+        #LOCAL {compass_2} {${directionColor}W${CLEAR_COLOR} $PERSONAL_COLOR<-${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_2} {${PERSONAL_COLOR}- <-${CLEAR_COLOR}};
+    };
+
+    #NOP Up.;
+    #IF {&data[u]} {
+        #LOCAL {compass_2} {$compass_2${directionColor}U${CLEAR_COLOR}${PERSONAL_COLOR}-(${CLEAR_COLOR}${centerColor}M${CLEAR_COLOR}${PERSONAL_COLOR})-${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_2} {$compass_2${PERSONAL_COLOR}--(${CLEAR_COLOR}${centerColor}M${CLEAR_COLOR}${PERSONAL_COLOR})-${CLEAR_COLOR}};
+    };
+
+    #NOP Down.;
+    #IF {&data[d]} {
+        #LOCAL {compass_2} {$compass_2${directionColor}D$PERSONAL_COLOR->${CLEAR_COLOR} };
+    }; #ELSE {
+        #LOCAL {compass_2} {$compass_2${PERSONAL_COLOR}-->${CLEAR_COLOR} };
+    };
+
+    #NOP East.;
+    #IF {&data[e]} {
+        #LOCAL {compass_2} {$compass_2${directionColor}E${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_2} {$compass_2${PERSONAL_COLOR}-${CLEAR_COLOR}};
+    };
+
+    #NOP Line 3.;
+    #NOP Southwest.;
+    #IF {&data[sw]} {
+        #LOCAL {compass_3} {${directionColor}SW${CLEAR_COLOR}     };
+    }; #ELSE {
+        #LOCAL {compass_3} {${PERSONAL_COLOR}-${CLEAR_COLOR}      };
+    };
+
+    #NOP South.;
+    #IF {&data[s]} {
+        #LOCAL {compass_3} {$compass_3${directionColor}S${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_3} {$compass_3${PERSONAL_COLOR}-${CLEAR_COLOR}};
+    };
+
+    #NOP Southeast.;
+    #IF {&data[se]} {
+        #LOCAL {compass_3} {$compass_3     ${directionColor}SE${CLEAR_COLOR}};
+    }; #ELSE {
+        #LOCAL {compass_3} {$compass_3      ${PERSONAL_COLOR}-${CLEAR_COLOR}};
+    };
+
+    #NOP Draw the three lines.;
+    #LINE IGNORE #SHOWME {$compass_1} {%2} {%3};
+    #LINE IGNORE #SHOWME {$compass_2} {%2 + 1} {%3};
+    #LINE IGNORE #SHOWME {$compass_3} {%2 + 2} {%3};
+};
+
+_widgetCreate {roomInfoWidget} {_roomInfoWidgetDraw} {16} {3};
+_panelCreate {roomInfo} {WIDGET} {roomInfoWidget};
+
+#CLASS {roomInfoWidget} {CLOSE};

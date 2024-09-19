@@ -1,0 +1,119 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Nicely formatted superbrief combat info.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {combat} {OPEN};
+
+#NOP Track if it's the first round of combat. If it is, we can't track how much;
+#NOP damage was done between rounds, because there's no "previous" round.;
+#VARIABLE {COMBAT_FIRST_ROUND} {1};
+
+#NOP Track the player's HP from the previous round.;
+#VARIABLE {COMBAT_LAST_HP} {0};
+
+#NOP Track the enemy's HP% from the previous round.;
+#VARIABLE {COMBAT_LAST_PERCENT} {0};
+
+#ACTION {You hit %1 %w%!{(?: times)?}, missing %3%!{(?: times)?} and %!{\w+} defends %4%!{(?: times)?}, leaving %!{\w+} at %5 percent. You are hit %6%!{(?: times)?}, are missed %7%!{(?: times)?}, and defend %8%!{(?: times)?}.} {
+    #NOP %0;
+    #LOCAL {youPercent} {};
+    #FORMAT {youPercent} {%f} {$GMCP[char][vitals][hp] / $GMCP[char][maxstats][maxhp] * 100};
+    #FORMAT {youPercent} {<088>@_colorScale{$GMCP[char][vitals][hp]; $GMCP[char][maxstats][maxhp]}%d%% <088>} {$youPercent};
+
+    #LOCAL {youDamageTaken} {};
+    #MATH {youDamageTaken} {($COMBAT_LAST_HP - $GMCP[char][vitals][hp]) / $GMCP[char][maxstats][maxhp] * 100};
+    #IF {$youDamageTaken < 0} {
+        #LOCAL {youDamageTaken} {0};
+    };
+    #LOCAL {youDamageTakenInverse} {};
+    #MATH {youDamageTakenInverse} {25 - $youDamageTaken};
+    #IF {$youDamageTakenInverse < 0} {
+        #LOCAL {youDamageTakenInverse} {0};
+    };
+    #FORMAT {youDamageTaken} {<088>@_colorScale{$youDamageTakenInverse; 25}%d%% <088>} {$youDamageTaken};
+
+    #LOCAL {youHit} {@__combatWordToNumber{%2}};
+    #LOCAL {youMiss} {@__combatWordToNumber{%3}};
+    #LOCAL {youDefend} {@__combatWordToNumber{%4}};
+
+    #LOCAL {youAttacks} {};
+    #MATH {youAttacks} {$youHit + $youMiss + $youDefend};
+
+    #FORMAT {youHit} {<088>@_colorScale{$youHit; $youAttacks}%d<088>} {$youHit};
+
+    #NOP THEM.;
+    #LOCAL {themPercent} {};
+    #FORMAT {themPercent} {<088>@_colorScale{%5; 100}%d%% <088>} {%5};
+    #LOCAL {themName} {%1};
+    #FORMAT {themName} {<088>@_colorScale{%5; 100}%s<088>} {$themName};
+
+    #LOCAL {themDamageTaken} {};
+    #MATH {themDamageTaken} {$COMBAT_LAST_PERCENT - %5};
+    #IF {$themDamageTaken < 0} {
+        #LOCAL {themDamageTaken} {0};
+    };
+    #FORMAT {themDamageTaken} {<088>@_colorScale{$themDamageTaken; 25}%d%% <088>} {$themDamageTaken};
+
+    #LOCAL {themHit} {@__combatWordToNumber{%6}};
+    #LOCAL {themMiss} {@__combatWordToNumber{%7}};
+    #LOCAL {themDefend} {@__combatWordToNumber{%8}};
+
+    #LOCAL {themAttacks} {};
+    #MATH {themAttacks} {$themHit + $themMiss + $themDefend};
+
+    #LOCAL {themHitInverse} {};
+    #MATH {themHitInverse} {$themAttacks - $themHit};
+
+    #FORMAT {themHit} {<088>@_colorScale{$themHitInverse; $themAttacks}%d<088>} {$themHit};
+
+    #IF {$COMBAT_FIRST_ROUND} {
+        #LOCAL {themDamageTaken} {};
+        #LOCAL {youDamageTaken} {};
+        #VARIABLE {COMBAT_FIRST_ROUND} {0};
+    };
+
+    #NOP OUTPUT.;
+    #ECHO {-------------------------------------------------------};
+    #ECHO {$themName};
+    #ECHO {\tHP\tDMG\tHIT\tMISS\tDEFEND\tATTACKS};
+    #ECHO {YOU:\t$youPercent\t$themDamageTaken\t$youHit\t$youMiss\t$youDefend\t$youAttacks};
+    #ECHO {THEM:\t$themPercent\t$youDamageTaken\t$themHit\t$themMiss\t$themDefend\t$themAttacks};
+
+    #VARIABLE {COMBAT_LAST_HP} {$GMCP[char][vitals][hp]};
+    #VARIABLE {COMBAT_LAST_PERCENT} {%5};
+
+    #DELAY {RESET_COMBAT} {
+        #VARIABLE {COMBAT_FIRST_ROUND} {1};
+        #VARIABLE {COMBAT_LAST_HP} {0};
+        #VARIABLE {COMBAT_LAST_PERCENT} {0};
+    } {5};
+} {4};
+
+#GAG {You hit %1 %w%!{(?: times)?}, missing %3%!{(?: times)?} and %!{\w+} defends %4%!{(?: times)?}, leaving %!{\w+} at %5 percent. You are hit %6%!{(?: times)?}, are missed %7%!{(?: times)?}, and defend %8%!{(?: times)?}.};
+
+#NOP Convert a number word two an actual number.;
+#NOP %1 - The word.;
+#FUNCTION {__combatWordToNumber} {
+    #SWITCH {"%1"} {
+     #CASE {"one"} {#RETURN 1;};
+     #CASE {"once"} {#RETURN 1;};
+     #CASE {"two"} {#RETURN 2;};
+     #CASE {"twice"} {#RETURN 2;};
+     #CASE {"three"} {#RETURN 3;};
+     #CASE {"thrice"} {#RETURN 3;};
+     #CASE {"four"} {#RETURN 4;};
+     #CASE {"five"} {#RETURN 5;};
+     #CASE {"six"} {#RETURN 6;};
+     #CASE {"seven"} {#RETURN 7;};
+     #CASE {"eight"} {#RETURN 8;};
+     #CASE {"nine"} {#RETURN 9;};
+     #CASE {"ten"} {#RETURN 10;};
+     #CASE {"eleven"} {#RETURN 11;};
+     #CASE {"twelve"} {#RETURN 12;};
+     #CASE {"thirteen"} {#RETURN 13;};
+     #CASE {"fourteen"} {#RETURN 14;};
+     #CASE {"fifteen"} {#RETURN 15;};
+     #DEFAULT {#RETURN 0;};
+    };
+};
+
+#CLASS {combat} {CLOSE};

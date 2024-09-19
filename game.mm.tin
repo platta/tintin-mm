@@ -1,0 +1,253 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Sample game class file;
+#NOP --------------------------------------------------------------------------;
+#CLASS {mm} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Functions and Aliases the base class will call while trying to connect.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Put your game's hostname in here.;
+#FUNCTION {__gameHostname} {
+    #RETURN {materiamagica.com};
+};
+
+#NOP Put your game's port in here.;
+#FUNCTION {__gamePort} {
+    #RETURN {4000};
+};
+
+#NOP Any actions that need to be done before starting the session.;
+#NOP E.G. Load any other classes your game requires to be in place before;
+#NOP logging in.;
+#ALIAS {__gameBeforeLogin} {
+    #NOP %0;
+    #NOP Core classes.;
+    _classLoad {split} {plugins};
+    _classLoad {buffer} {plugins};
+    _classLoad {widget} {plugins};
+    _classLoad {panel} {plugins};
+
+    #NOP MM classes.;
+    _classLoad {mmevents} {game.mm/plugins};
+    _classLoad {captures} {game.mm/plugins};
+    _classLoad {gmcp} {game.mm/plugins};
+    _classLoad {magicmap} {game.mm/plugins};
+    _classLoad {mapper} {game.mm/plugins};
+    _classLoad {autosac} {game.mm/plugins};
+    _classLoad {roomInfoWidget} {game.mm/plugins};
+    _classLoad {vitalsWidget} {game.mm/plugins};
+    _classLoad {roomDetailWidget} {game.mm/plugins};
+    _classLoad {combat} {game.mm/plugins};
+
+    _keepalive;
+
+    #NOP Can be overridden with a user's personal color.;
+    #VARIABLE {PERSONAL_COLOR} {<fff>};
+
+    #NOP Can be overridden with a chat signature.;
+    #VARIABLE {CHAT_SIGNATURE} {};
+
+    #NOP Can be overridden with a chat color.;
+    #VARIABLE {CHAT_COLOR} {|W};
+
+    #NOP Use mouse input.;
+    #CONFIG {MOUSE} {ON};
+};
+
+#NOP Actions to perform immediately after starting the session.;
+#NOP E.G. Answer post-login game prompts to fully log in.;
+#ALIAS {__gameAfterLogin} {
+    #NOP %0;
+    #NOP Try to go into the world.;
+    1;
+    #NOP Failing that, try to go into chat.;
+    2;
+
+    #NOP Trigger these values to be sent to prime plugins and such.;
+    protocols gmcp sendchar;
+    protocols gmcp sendroom;
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Shared functions and aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#ALIAS {ls} {l};
+
+#NOP Clan talk color.;
+#ALIAS {~^ct %1$} {
+    #SEND {ct ${CHAT_SIGNATURE}${CHAT_COLOR}%1|X};
+};
+
+#NOP Alliance talk color.;
+#ALIAS {~^at %1$} {
+    #SEND {alliance talk ${CHAT_SIGNATURE}${CHAT_COLOR}%1|X};
+};
+
+#NOP Standard desktop layout.;
+#ALIAS {_desktopLayout} {
+    #NOP %0;
+    _splitSize {TOP} {16};
+    _splitSize {BOTTOM} {5};
+    _splitSize {RIGHT} {-100};
+
+    _panelDock {logs} {TOP} {4} {4} {6} {6};
+    _panelDock {allClan} {TOP} {1} {1} {6} {3};
+    _panelDock {allTalk} {TOP} {1} {4} {3} {6};
+
+    _panelDock {roomInfo} {BOTTOM} {1} {5} {6} {6};
+    _panelDock {vitals} {BOTTOM} {1} {1} {6} {2};
+
+    _panelDock {map} {RIGHT} {1} {1} {5} {6};
+    _panelDock {roomDetail} {RIGHT} {6} {1} {6} {6};
+};
+
+#NOP Standard mobile layout.;
+#ALIAS {_mobileLayout} {
+    #NOP %0;
+    _splitSize {TOP} {16};
+    _splitSize {BOTTOM} {5};
+    _splitSize {RIGHT} {-72};
+
+    _panelHide {logs};
+    _panelDock {allClan} {TOP} {1} {1} {4} {6};
+    _panelDock {allTalk} {TOP} {5} {1} {6} {6};
+
+    _panelDock {roomInfo} {BOTTOM} {1} {4} {6} {6};
+    _panelDock {vitals} {BOTTOM} {1} {1} {6} {3};
+
+    _panelDock {map} {RIGHT} {1} {1} {6} {6};
+    _panelHide {roomDetail} {RIGHT} {6} {1} {6} {6};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Register and unregister events.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Handle session activation.;
+_eventHandlerRegister {SESSION ACTIVATED} {_mmSessionActivatedHandler};
+#ALIAS {_mmSessionActivatedHandler} {
+    #NOP %0;
+    #LOCAL {sessionPrefix} {};
+    #FORMAT {sessionPrefix} {%.3s} {%1};
+    #IF {"$sessionPrefix" == "mm."} {
+        #%1 {_eventFire {SPLIT REFRESH}};
+    };
+};
+
+#NOP Numpad movement.;
+_eventHandlerRegister {NUMPAD 8} {_mmNumpad8Handler}
+#ALIAS {_mmNumpad8Handler} {
+    #NOP %0;
+    #SEND {north};
+};
+_eventHandlerRegister {NUMPAD 9} {_mmNumpad9Handler}
+#ALIAS {_mmNumpad9Handler} {
+    #NOP %0;
+    #SEND {northeast};
+};
+_eventHandlerRegister {NUMPAD 6} {_mmNumpad6Handler}
+#ALIAS {_mmNumpad6Handler} {
+    #NOP %0;
+    #SEND {east};
+};
+_eventHandlerRegister {NUMPAD 3} {_mmNumpad3Handler}
+#ALIAS {_mmNumpad3Handler} {
+    #NOP %0;
+    #SEND {southeast};
+};
+_eventHandlerRegister {NUMPAD 2} {_mmNumpad2Handler}
+#ALIAS {_mmNumpad2Handler} {
+    #NOP %0;
+    #SEND {south};
+};
+_eventHandlerRegister {NUMPAD 1} {_mmNumpad1Handler}
+#ALIAS {_mmNumpad1Handler} {
+    #NOP %0;
+    #SEND {southwest};
+};
+_eventHandlerRegister {NUMPAD 4} {_mmNumpad4Handler}
+#ALIAS {_mmNumpad4Handler} {
+    #NOP %0;
+    #SEND {west};
+};
+_eventHandlerRegister {NUMPAD 7} {_mmNumpad7Handler}
+#ALIAS {_mmNumpad7Handler} {
+    #NOP %0;
+    #SEND {northwest};
+};
+_eventHandlerRegister {NUMPAD 5} {_mmNumpad5Handler}
+#ALIAS {_mmNumpad5Handler} {
+    #NOP %0;
+    #SEND {look};
+};
+_eventHandlerRegister {NUMPAD PLUS} {_mmNumpadPlusHandler}
+#ALIAS {_mmNumpadPlusHandler} {
+    #NOP %0;
+    #SEND {up};
+};
+_eventHandlerRegister {NUMPAD MINUS} {_mmNumpadMinusHandler}
+#ALIAS {_mmNumpadMinusHandler} {
+    #NOP %0;
+    #SEND {down};
+};
+
+#NOP Numpad looking.;
+_eventHandlerRegister {NUMPAD ALT 8} {_mmNumpadAlt8Handler}
+#ALIAS {_mmNumpadAlt8Handler} {
+    #NOP %0;
+    #SEND {look north};
+};
+_eventHandlerRegister {NUMPAD ALT 9} {_mmNumpadAlt9Handler}
+#ALIAS {_mmNumpadAlt9Handler} {
+    #NOP %0;
+    #SEND {look northeast};
+};
+_eventHandlerRegister {NUMPAD ALT 6} {_mmNumpadAlt6Handler}
+#ALIAS {_mmNumpadAlt6Handler} {
+    #NOP %0;
+    #SEND {look east};
+};
+_eventHandlerRegister {NUMPAD ALT 3} {_mmNumpadAlt3Handler}
+#ALIAS {_mmNumpadAlt3Handler} {
+    #NOP %0;
+    #SEND {look southeast};
+};
+_eventHandlerRegister {NUMPAD ALT 2} {_mmNumpadAlt2Handler}
+#ALIAS {_mmNumpadAlt2Handler} {
+    #NOP %0;
+    #SEND {look south};
+};
+_eventHandlerRegister {NUMPAD ALT 1} {_mmNumpadAlt1Handler}
+#ALIAS {_mmNumpadAlt1Handler} {
+    #NOP %0;
+    #SEND {look southwest};
+};
+_eventHandlerRegister {NUMPAD ALT 4} {_mmNumpadAlt4Handler}
+#ALIAS {_mmNumpadAlt4Handler} {
+    #NOP %0;
+    #SEND {look west};
+};
+_eventHandlerRegister {NUMPAD ALT 7} {_mmNumpadAlt7Handler}
+#ALIAS {_mmNumpadAlt7Handler} {
+    #NOP %0;
+    #SEND {look northwest};
+};
+_eventHandlerRegister {NUMPAD ALT 5} {_mmNumpadAlt5Handler}
+#ALIAS {_mmNumpadAlt5Handler} {
+    #NOP %0;
+    #SEND {look};
+};
+_eventHandlerRegister {NUMPAD ALT PLUS} {_mmNumpadAltPlusHandler}
+#ALIAS {_mmNumpadAltPlusHandler} {
+    #NOP %0;
+    #SEND {look up};
+};
+_eventHandlerRegister {NUMPAD ALT MINUS} {_mmNumpadAltMinusHandler}
+#ALIAS {_mmNumpadAltMinusHandler} {
+    #NOP %0;
+    #SEND {look down};
+};
+
+#CLASS {mm} {CLOSE};

@@ -1,0 +1,130 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Vitals widget;
+#NOP Shows the character's current vitals.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {vitalsWidget} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Update current data.;
+#ALIAS {_vitalsWidgetUpdateCurrent} {
+    #NOP %0;
+    #LOCAL {data} {@_widgetGetData{{vitalsWidget}}};
+    #LOCAL {data[hp]} {$GMCP[char][vitals][hp]};
+    #LOCAL {data[sp]} {$GMCP[char][vitals][sp]};
+    #LOCAL {data[st]} {$GMCP[char][vitals][st]};
+
+    _widgetUpdateData {vitalsWidget} {$data};
+};
+
+#NOP Update max stats.;
+#ALIAS {_vitalsWidgetUpdateMax} {
+    #NOP %0;
+    #LOCAL {data} {@_widgetGetData{{vitalsWidget}}};
+    #VARIABLE {data[maxhp]} {$GMCP[char][maxstats][maxhp]};
+    #VARIABLE {data[maxsp]} {$GMCP[char][maxstats][maxsp]};
+    #VARIABLE {data[maxst]} {$GMCP[char][maxstats][maxst]};
+
+    _widgetUpdateData {vitalsWidget} {$data};
+};
+
+#NOP Draw the widget.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_vitalsWidgetDraw} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #NOP Minimum width to render bars.;
+    #LOCAL {minWidthBars} {20};
+
+    #NOP Calculate actual measurements.;
+    #LOCAL {top} {};
+    #MATH {top} {%2 + 1};
+    #LOCAL {left} {};
+    #MATH {left} {%3 + 1};
+    #LOCAL {bottom} {};
+    #MATH {bottom} {%4 - 1};
+    #LOCAL {right} {};
+    #MATH {right} {%5 - 1};
+
+    #LOCAL {width} {};
+    #MATH {width} {$right - $left + 1};
+
+    #DRAW {$BOX_COLOR} {$BOX_STYLE} {BOX} {%2} {%3} {%4} {%5};
+    #SCREEN {CLEAR} {SQUARE} {$top} {$left} {$bottom} {$right};
+
+    #IF {$width < $minWidthBars} {
+        #NOP Too small to draw colored bars.;
+        _vitalsWidgetDrawNumbers {$data} {$top} {$left} {$bottom} {$right};
+    }; #ELSE {
+        _vitalsWidgetDrawNumbers {$data} {$top} {$left} {$bottom} {$right};
+        _vitalsWidgetDrawBars {$data} {$top} {$left + 14} {$bottom} {$right};
+    };
+};
+
+#NOP Draw the numbers part of the widget.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_vitalsWidgetDrawNumbers} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #LOCAL {hp} {};
+    #FORMAT {hp} {${CLEAR_COLOR}@_colorScale{$data[hp]; $data[maxhp]}%g${CLEAR_COLOR}${PERSONAL_COLOR}/${CLEAR_COLOR}} {$data[hp]};
+    #LOCAL {maxhp} {};
+    #FORMAT {maxhp} {${PERSONAL_COLOR}%ghp${CLEAR_COLOR}} {$data[maxhp]};
+
+    #LOCAL {sp} {};
+    #FORMAT {sp} {${CLEAR_COLOR}@_colorScale{$data[sp]; $data[maxsp]}%g${CLEAR_COLOR}${PERSONAL_COLOR}/${CLEAR_COLOR}} {$data[sp]};
+    #LOCAL {maxsp} {};
+    #FORMAT {maxsp} {${PERSONAL_COLOR}%gsp${CLEAR_COLOR}} {$data[maxsp]};
+
+    #LOCAL {st} {};
+    #FORMAT {st} {${CLEAR_COLOR}@_colorScale{$data[st]; $data[maxst]}%g${CLEAR_COLOR}${PERSONAL_COLOR}/${CLEAR_COLOR}} {$data[st]};
+    #LOCAL {maxst} {};
+    #FORMAT {maxst} {${PERSONAL_COLOR}%gst${CLEAR_COLOR}} {$data[maxst]};
+
+    #DRAW {RALIGN} {SIDE} {%2} {%3} {%2} {%3 + 5} {$hp};
+    #DRAW {RALIGN} {SIDE} {%2} {%3 + 6} {%2} {%3 + 12} {$maxhp};
+    #DRAW {RALIGN} {SIDE} {%2 + 1} {%3} {%2 + 1} {%3 + 5} {$sp};
+    #DRAW {RALIGN} {SIDE} {%2 + 1} {%3 + 6} {%2 + 1} {%3 + 12} {$maxsp};
+    #DRAW {RALIGN} {SIDE} {%2 + 2} {%3} {%2 + 2} {%3 + 5} {$st};
+    #DRAW {RALIGN} {SIDE} {%2 + 2} {%3 + 6} {%2 + 2} {%3 + 12} {$maxst};
+};
+
+#NOP Draw the bar part of the widget.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_vitalsWidgetDrawBars} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #IF {$data[maxhp] > 0} {
+        #DRAW {RED} {HORIZONTAL} {BAR} {%2} {%3} {%2} {%5} {$data[hp]; $data[maxhp]};
+    };
+    #IF {$data[maxsp] > 0} {
+        #DRAW {BLUE} {HORIZONTAL} {BAR} {%2 + 1} {%3} {%2 + 1} {%5} {$data[sp]; $data[maxsp]};
+    };
+    #IF {$data[maxst] > 0} {
+        #DRAW {GREEN} {HORIZONTAL} {BAR} {%2 + 2} {%3} {%2 + 2} {%5} {$data[st]; $data[maxst]};
+    };
+};
+
+_widgetCreate {vitalsWidget} {_vitalsWidgetDraw} {15} {3};
+_eventHandlerRegister {IAC SB GMCP char.vitals IAC SE} {_vitalsWidgetUpdateCurrent};
+_eventHandlerRegister {IAC SB GMCP char.maxstats IAC SE} {_vitalsWidgetUpdateMax};
+_panelCreate {vitals} {WIDGET} {vitalsWidget};
+
+#CLASS {vitalsWidget} {CLOSE};

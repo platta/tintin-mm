@@ -1,0 +1,92 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Widget that captures room information.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {roomDetailWidget} {OPEN};
+
+#NOP When we get GMCP room info, we immediately get vitals, and then we get;
+#NOP them again after the room output is done. If we track the arrival of thsoe;
+#NOP two vitals payloads after a room payload, we can capture the full game;
+#NOP text for the room.;
+#VARIABLE {ROOM_DETAIL_ACTIVE} {0};
+
+#NOP Track actual mob names.;
+#VARIABLE {ROOM_DETAIL_MOBS} {};
+
+#NOP Draw the widget.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_roomDetailWidgetDraw} {
+    _bufferDraw {roomDetailWidget} {%2} {%3} {%4} {%5};
+};
+
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomDetailWidgetRoom};
+#ALIAS {_roomDetailWidgetRoom} {
+    #NOP %0;
+    _debug {RECEIVED ROOM};
+    #VARIABLE {ROOM_DETAIL_ACTIVE} {2};
+    #VARIABLE {ROOM_DETAIL_MOBS} {};
+    _bufferClear {roomDetailWidget};
+};
+
+#ALIAS {_roomDetailWidgetStep} {
+    #NOP %0;
+    #IF {$ROOM_DETAIL_ACTIVE} {
+        _debug {RECEIVED Step $ROOM_DETAIL_ACTIVE};
+        #MATH {ROOM_DETAIL_ACTIVE} {$ROOM_DETAIL_ACTIVE - 1};
+
+        #IF {!$ROOM_DETAIL_ACTIVE} {
+            #LOOP {1} {&ROOM_DETAIL_MOBS[]} {i} {
+                #IF {@__eventIsRegistered{MOB SPOTTED $ROOM_DETAIL_MOBS[$i]}} {
+                    _eventFire {MOB SPOTTED $ROOM_DETAIL_MOBS[$i]} {$ROOM_DETAIL_MOBS[$i]};
+                };
+            };
+            _widgetUpdateData {roomDetailWidget} {};
+        };
+    };
+};
+
+_eventHandlerRegister {IAC SB GMCP char.vitals IAC SE} {_roomDetailWidgetVitals};
+#ALIAS {_roomDetailWidgetVitals} {
+    #NOP %0;
+    _roomDetailWidgetStep;
+};
+
+_eventHandlerRegister {PROMPT} {_roomDetailWidgetPrompt};
+#ALIAS {_roomDetailWidgetPrompt} {
+    #NOP %0;
+    _roomDetailWidgetStep;
+};
+
+#ACTION {~^%!{(?:\e\[0m)*?}%!{(?:(?:\e\[0m)?\e\[[0-9;]*m\*\e\[0m)*?}%!{(?:\e\[0m\e\[[0-9;]*m\[.+\](?: ?\e\[0m)+ ?)*?}%!{(?:\e\[0m\e\[[0-9;]*m\*\e\[0m)*?}%!{\e\[0m\e\[0;38;5;10m}%1%!{(?:\e\[0m )?}$} {
+    #IF {$ROOM_DETAIL_ACTIVE} {
+        _bufferAdd {roomDetailWidget} {%0};
+        #LINE {STRIP} {#LIST {ROOM_DETAIL_MOBS} {INS} {-1} {%1}};
+    };
+};
+
+_bufferCreate {roomDetailWidget} {0} {0} {1};
+_widgetCreate {roomDetailWidget} {_roomDetailWidgetDraw};
+_panelCreate {roomDetail} {WIDGET} {roomDetailWidget};
+
+_eventHandlerRegister {WIDGET CLICKED roomDetailWidget} {_roomDetailWidgetClickedHandler};
+#ALIAS {_roomDetailWidgetClickedHandler} {
+    #NOP %0;
+    _bufferUnlock {roomDetailWidget};
+    _widgetUpdateData {roomDetailWidget} {};
+};
+
+_eventHandlerRegister {WIDGET SCROLLED roomDetailWidget} {_roomDetailWidgetScrolledHandler};
+#ALIAS {_roomDetailWidgetScrolledHandler} {
+    #NOP %0;
+    #IF {%1 > 0} {
+        _bufferUp {roomDetailWidget} {%1};
+    }; #ELSE {
+        _bufferDown {roomDetailWidget} {-%1};
+    };
+    _widgetUpdateData {roomDetailWidget} {};
+}
+
+#CLASS {roomDetailWidget} {CLOSE};
