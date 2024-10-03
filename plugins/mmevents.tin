@@ -33,9 +33,15 @@ _eventRegister {BOAT PROMPT};
 
 #NOP Social prompt;
 _eventRegister {SOCIAL PROMPT};
-#ACTION {^(Social) $} {
+#ACTION {^%!{.*}(Social) $} {
     _eventFire {PROMPT};
     _eventFire {SOCIAL PROMPT};
+};
+
+#NOP Ship scan action;
+_eventRegister {SHIP SCAN};
+#ACTION {^You climb up to the crow's nest of %1 and look in every direction.$} {
+    _eventFire {SHIP SCAN};
 };
 
 #CLASS {mmevents} {CLOSE};

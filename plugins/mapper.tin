@@ -20,7 +20,7 @@
 #VARIABLE {PREVIOUS_LOCATIONS} {};
 
 #NOP Enable or disable click-to-walk.;
-#VARIABLE {CLICK_TO_WALK} {0};
+#VARIABLE {CLICK_TO_WALK} {1};
 
 #NOP Map weights for various terrains.;
 #NOP This helps the mapper calculate better paths (i.e. it'll prefer roads).;
@@ -274,6 +274,7 @@
 #ALIAS {_mapperReadMap} {
     #NOP %0;
     #MAP READ {$__base/game.mm/gmcp.map};
+    _panelDraw {map};
 };
 
 #NOP Write the map to file.;
@@ -298,33 +299,63 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
     #NOP Update room properties.;
     __mapperUpdateRoomProperties;
 
-    #NOP Update graphics mode.;
-    __mapperUpdateGraphicsMode;
+    #IF {&GMCP[room][info][coord][sym]} {
+        #VARIABLE {MAPPER_IN_WILDERNESS} {1};
+    }; #ELSE {
+        #VARIABLE {MAPPER_IN_WILDERNESS} {0};
+    };
 
     #IF {$MAPPER_IN_WILDERNESS} {
+        #NOP If we're in the wilderness, wait for the prompt so we can capture;
+        #NOP the circle that the game sends as part of the room. We will wait;
+        #NOP until after that to fire the updated event.;
         #VARIABLE {MAPPER_AWAITING_PROMPT} {1};
+    }; #ELSE {
+        #NOP If we're not in the wilderness, fire the event to draw the map;
+        #NOP now, since we're not doing anything else;
+        _eventFire {MAP UPDATED};
     };
 };
 
-#NOP Set the graphics mode to fit the type of room we're in.;
-#ALIAS {__mapperUpdateGraphicsMode} {
+#NOP Draw the map.;
+#NOP %1 - Top coordinate;
+#NOP %2 - Left coordinate;
+#NOP %3 - Bottom coordinate;
+#NOP %4 - Right coordinate;
+#ALIAS {_mapDraw} {
     #NOP %0;
-    #IF {&GMCP[room][info][coord][sym]} {
-        #NOP In the wilderness.;
-        #VARIABLE {MAPPER_IN_WILDERNESS} {1};
-        #MAP {FLAG} {SYMBOLGRAPHICS} {ON};
-        #MAP {FLAG} {FAST} {ON};
+    #NOP Determine the current state of the VTMAP flag.;
+    #LOCAL {mapFlags} {};
+    #LINE {QUIET} {#LINE {CAPTURE} {mapFlags} {#MAP {FLAG};};};
+    #LOCAL {vtmapFlagIndex} {};
+    #LIST {mapFlags} {FIND} {{.*}VTMAP{.*}} {vtmapFlagIndex};
+    #REGEXP {$mapFlags[$vtmapFlagIndex]} {VTMAP FLAG IS SET TO {.*}.} {
+        #VARIABLE {__vtmapFlag} {&1};
+    } {
+        #VARIABLE {__vtmapFlag} {OFF};
+    };
+    #IF {$MAPPER_IN_WILDERNESS} {
+        #IF {"$__vtmapFlag" == "ON"} {
+            #MAP {FLAG} {VTMAP} {OFF};
+        };
 
-        #NOP Disable click to walk.;
-        #VARIABLE {CLICK_TO_WALK} {0};
+        #LOCAL {width} {};
+        #LOCAL {height} {};
+        #MATH {width} {%4 - %2 - 1};
+        #MATH {height} {%3 - %1 - 1};
+
+        #LOCAL {result} {};
+        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_read" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" ${GMCP[room][info][coord][x]} ${GMCP[room][info][coord][y]} $width $height};
+        #DRAW {$BOX_COLOR} {$BOX_STYLE} {TALIGN} {BOX} {%1} {%2} {%3} {%4} $result[1..$height];
+
     }; #ELSE {
-        #NOP Not wilderness.;
-        #VARIABLE {MAPPER_IN_WILDERNESS} {0};
-        #MAP {FLAG} {ASCIIGRAPHICS} {ON};
-        #MAP {FLAG} {FAST} {OFF};
-
-        #NOP Enable click to walk.;
-        #VARIABLE {CLICK_TO_WALK} {1};
+        #IF {"$__vtmapFlag" == "OFF"} {
+            #DRAW {$BOX_COLOR} {$BOX_STYLE} {BOX} {%1} {%2} {%3} {%4};
+            #MAP {OFFSET} {%1 + 1 + $MAP_TWEAK[TOP]} {%2 + 1 + $MAP_TWEAK[LEFT]} {%3 - 1 + $MAP_TWEAK[BOTTOM]} {%4 - 1 + $MAP_TWEAK[RIGHT]};
+            #MAP {FLAG} {ASCIIGRAPHICS} {ON};
+            #MAP {FLAG} {FAST} {OFF};
+            #MAP {FLAG} {VTMAP} {ON};
+        };
     };
 };
 
@@ -560,6 +591,12 @@ _panelCreate {map} {MAP};
 
 _eventHandlerRegister {SESSION DISCONNECTED} {_mapperWriteMap};
 
+_eventHandlerRegister {SHIP SCAN} {_mapperReceivedShipScan};
+#ALIAS {_mapperReceivedShipScan} {
+    #NOP %0;
+    #VARIABLE {MAPPER_AWAITING_PROMPT} {1};
+};
+
 _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
 #ALIAS {_mapperReceivedPrompt} {
     #NOP %0;
@@ -567,7 +604,7 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         #VARIABLE {MAPPER_AWAITING_PROMPT} {0};
         #LOCAL {foo} {@_mapperFindCircle{}};
 
-
+        _eventFire {MAP UPDATED};
     };
 };
 
@@ -578,11 +615,15 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
     #NOP If we just entered a room, look for the line that's part of the;
     #NOP room header.;
     #LOCAL {roomLine} {0};
-    #BUFFER {FIND} {%!{^\e\[[0-9;]*m\(-{46}\e\[0m\e\[[0-9;]*m---\)}} {roomLine};
+    #BUFFER {FIND} {%!{^(?:\e\[[0-9;]*m)+\(-{46}(?:\e\[[0-9;]*m)+---\)}} {roomLine};
 
     #NOP If we just did ship scan, look for the crow's nest message.;
     #LOCAL {shipScanLine} {0};
-    #BUFFER {FIND} {You climb up to the crow's nest of} {shipScanLine};
+    #BUFFER {FIND} {^You climb up to the crow's nest of {.*} and look in every direction.$} {shipScanLine};
+
+    #IF {$roomLine == 0 && $shipScanLine == 0} {
+        #RETURN;
+    };
 
     #IF {$roomLine > $shipScanLine} {
         #NOP If the room line is the most recent one, the map either starts;
@@ -617,6 +658,7 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         #NOP Get the actual contents of the current line.;
         #LOCAL {line} {};
         #BUFFER {GET} {line} {$i};
+        #REPLACE {line} {\\} {\\};
 
         #IF {$increasing} {
             #NOP We are at the part where the circle is increasing in size.;
@@ -687,7 +729,7 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
     #MATH {sextantLeft} {$GMCP[room][info][coord][x] - ($mapWidth - 1) / 2};
 
     #VARIABLE {MAPPER_ROOM_DATA} {};
-    #VARIABLE {MAPPER_DEBUG_DATA} {};
+    #LOCAL {roomCount} {0};
 
     #NOP Now, loop through the rows and capture the map data.;
     #LOOP {0} {$mapHeight - 1} {i} {
@@ -703,75 +745,27 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         #NOP Get this line of the buffer.;
         #LOCAL {line} {};
         #BUFFER {GET} {line} {$lineNumber};
+        #REPLACE {line} {\\} {\\};
 
+        #LOCAL {foo} {};
+        #LOCAL {lineIndex} {};
 
-        #NOP TODO: Deal with these...;
-        #REPLACE {line} {\x7B} { };
-        #REPLACE {line} {\x7D} { };
-        #LIST {MAPPER_DEBUG_DATA} {ADD} {$line};
-
-
-
-        #LOCAL {escape} {0};
-        #LOCAL {escapeChars} {};
-        #LOCAL {color} {0};
-
-        #LOCAL {char} {};
-        #PARSE {$line} {char} {
-            #IF {$escape} {
-                #IF {"$char" === "m"} {
-                    #NOP "m" signals the end of the escape.;
-                    #NOP Set the current color value here.;
-                    #IF {&MAPPER_DB_COLOR_MAP[$escapeChars]} {
-                        #LOCAL {color} {$MAPPER_DB_COLOR_MAP[$escapeChars]};
-                    }; #ELSE {
-                        #LOCAL {color} {12632256};
-                        _warn {Unknown color code $escapeChars};
-                    };
-
-                    #LOCAL {escape} {0};
-                    #LOCAL {escapeChars} {};
-                    #CONTINUE;
-                }; #ELSE {
-                    #NOP Collect escaped characters.;
-                    #LOCAL {escapeChars} {$escapeChars$char};
-                };
-            }; #ELSE {
-                #NOP Detect beginning of escape sequence;
-                #IF {"$char" == "\e"} {
-                    #LOCAL {escape} {1};
-                    #CONTINUE;
-                };
-
-                #NOP Only capture if there is a character.;
-                #IF {"$char" !== " "} {
-                    #IF {$mapY == $GMCP[room][info][coord][y] and $mapX == $GMCP[room][info][coord][x]} {
-                        #LIST {MAPPER_ROOM_DATA} {ADD} {
-                            {zone} {$GMCP[room][info][zone]}
-                            {color} {$MAPPER_DB_CODE_MAP[$GMCP[room][info][coord][color]]}
-                            {symbol} {$GMCP[room][info][coord][sym]}
-                            {x} {$GMCP[room][info][coord][x]}
-                            {y} {$GMCP[room][info][coord][y]}
-                        };
-
-                        #NOP Store drawn data for current room.;
-                        #VARIABLE {MAPPER_CURRENT_ROOM_COLOR} {$color};
-                        #VARIABLE {MAPPER_CURRENT_ROOM_SYMBOL} {$char};
-                    }; #ELSE {
-                        #LIST {MAPPER_ROOM_DATA} {ADD} {
-                            {zone} {$GMCP[room][info][zone]}
-                            {color} {$color}
-                            {symbol} {$char}
-                            {x} {$mapX}
-                            {y} {$mapY}
-                        };
-                    };
-                };
-
-                #NOP Advance the X coordinate.;
-                #MATH {mapX} {$mapX + 1};
-            };
+        #IF {$i >= $centerLine} {
+            #MATH {lineIndex} {$mapHeight - $i};
+        }; #ELSE {
+            #MATH {lineIndex} {$i + 1};
         };
+        #MATH {foo} {$mapWidth - $lineLengths[$lineIndex]};
+        #VARIABLE {TEST_LINE_LENGTHS} {$lineLengths};
+
+        #LOCAL {bar} {};
+        #MATH {bar} {$mapX + $foo};
+
+        #LOCAL {fooline} {@_stringSkip{{$line}; $foo}};
+        #REPLACE {fooline} {"} {\"};
+
+        #LOCAL {result} {};
+        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$fooline"};
     };
 };
 
@@ -798,38 +792,37 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
 #NOP This maps the escape codes for colors to the numeric values we need for;
 #NOP the database.;
 #VARIABLE {MAPPER_DB_COLOR_MAP} {
-    {[0;38;5;12} {16711680}
-    {[0;38;5;9} {255}
-    {[0;38;5;14} {16776960}
-    {[0;38;5;13} {16711935}
-    {[0;38;5;11} {65535}
-    {[0;38;5;15} {16777215}
-    {[0;38;5;10} {65280}
-    {[0;38;5;4} {8388608}
-    {[0;38;5;1} {128}
-    {[0;38;5;6} {8421376}
-    {[0;38;5;5} {8388736}
-    {[0;38;5;3} {32896}
-    {[0;38;5;7} {12632256}
-    {[0;38;5;2} {32768}
-    {[0;38;5;8} {8421504}
-    {[38;5;12} {16711680}
-    {[38;5;9} {255}
-    {[38;5;14} {16776960}
-    {[38;5;13} {16711935}
-    {[38;5;11} {65535}
-    {[38;5;15} {16777215}
-    {[38;5;10} {65280}
-    {[38;5;4} {8388608}
-    {[38;5;1} {128}
-    {[38;5;6} {8421376}
-    {[38;5;5} {8388736}
-    {[38;5;3} {32896}
-    {[38;5;7} {12632256}
-    {[38;5;2} {32768}
-    {[38;5;8} {8421504}
-    {[0} {12632256}
+    {0;38;5;12} {16711680}
+    {0;38;5;9} {255}
+    {0;38;5;14} {16776960}
+    {0;38;5;13} {16711935}
+    {0;38;5;11} {65535}
+    {0;38;5;15} {16777215}
+    {0;38;5;10} {65280}
+    {0;38;5;4} {8388608}
+    {0;38;5;1} {128}
+    {0;38;5;6} {8421376}
+    {0;38;5;5} {8388736}
+    {0;38;5;3} {32896}
+    {0;38;5;7} {12632256}
+    {0;38;5;2} {32768}
+    {0;38;5;8} {8421504}
+    {38;5;12} {16711680}
+    {38;5;9} {255}
+    {38;5;14} {16776960}
+    {38;5;13} {16711935}
+    {38;5;11} {65535}
+    {38;5;15} {16777215}
+    {38;5;10} {65280}
+    {38;5;4} {8388608}
+    {38;5;1} {128}
+    {38;5;6} {8421376}
+    {38;5;5} {8388736}
+    {38;5;3} {32896}
+    {38;5;7} {12632256}
+    {38;5;2} {32768}
+    {38;5;8} {8421504}
+    {0} {12632256}
 };
-
 
 #CLASS {mapper} {CLOSE};

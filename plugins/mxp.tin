@@ -252,10 +252,6 @@
 
     _debug {Parsing MXP tag ${element[name]}};
 
-    #IF {"$element[name]" === "VERSION"} {
-        @_mxpVersion{};
-    }
-
     #NOP Extract all matches.;
     #LOCAL {matches} {};
     #CONFIG CONVERT ON;
@@ -697,7 +693,10 @@ _mxpCreatePositional {EXPIRE} {NAME};
 
 #NOP --------------------------------------------------------------------------;
 #NOP VERSION;
-_mxpCreateElement {VERSION} {0} {1};
+_mxpCreateElement {VERSION} {0} {1} {@_mxpVersionHandler};
+#FUNCTION {_mxpVersionHandler} {
+    #SEND {\e[1z<VERSION MXP=1.0 CLIENT=TINTIN++ VERSION=2.02.04>};
+};
 
 #NOP --------------------------------------------------------------------------;
 #NOP SUPPORT;

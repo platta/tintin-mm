@@ -25,7 +25,7 @@
 _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomDetailWidgetRoom};
 #ALIAS {_roomDetailWidgetRoom} {
     #NOP %0;
-    _debug {RECEIVED ROOM};
+    #NOP _debug {RECEIVED ROOM};
     #VARIABLE {ROOM_DETAIL_ACTIVE} {2};
     #VARIABLE {ROOM_DETAIL_MOBS} {};
     _bufferClear {roomDetailWidget};
@@ -34,7 +34,7 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomDetailWidgetRoom};
 #ALIAS {_roomDetailWidgetStep} {
     #NOP %0;
     #IF {$ROOM_DETAIL_ACTIVE} {
-        _debug {RECEIVED Step $ROOM_DETAIL_ACTIVE};
+        #NOP _debug {RECEIVED Step $ROOM_DETAIL_ACTIVE};
         #MATH {ROOM_DETAIL_ACTIVE} {$ROOM_DETAIL_ACTIVE - 1};
 
         #IF {!$ROOM_DETAIL_ACTIVE} {
