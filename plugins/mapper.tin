@@ -7,6 +7,16 @@
 #NOP Variables.;
 #NOP --------------------------------------------------------------------------;
 
+#NOP Track if the map is loaded or not.;
+#VARIABLE {MAPPER_MAP_LOADED} {0};
+
+#NOP Track if the map is "active". This is to prevent collilsions if you have;
+#NOP multiple sessions open. Only one session should be "active" at a time.;
+#VARIABLE {MAPPER_MAP_ACTIVE} {0};
+
+#NOP Delay when running.;
+#VARIABLE {MAPPER_RUN_DELAY} {0};
+
 #NOP Flag to indicate if we're in the wilderness or not.;
 #VARIABLE {MAPPER_IN_WILDERNESS} {0};
 
@@ -86,6 +96,32 @@
 #VARIABLE {MAPPER_ROOM_DATA} {};
 
 #NOP --------------------------------------------------------------------------;
+#NOP Functions.;
+#NOP --------------------------------------------------------------------------;
+#ALIAS {_mapperStopSpeedwalk} {
+    #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
+    #NOP Determine if a path is defined.;
+    #LOCAL {length} {};
+    #PATH {GET} {LENGTH} {length};
+
+    #NOP Determine if we're currently running.;
+    #LOCAL {running} {};
+    #PATH {GET} {RUNNING} {running};
+
+    #IF {$running > 0} {
+        #PATH {STOP};
+    };
+
+    #IF {$length > 0} {
+        #PATH {DESTROY};
+    };
+};
+
+#NOP --------------------------------------------------------------------------;
 #NOP Aliases.;
 #NOP --------------------------------------------------------------------------;
 
@@ -93,6 +129,11 @@
 #NOP %1 - Room description to search.;
 #ALIAS {_go} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
+    _mapperStopSpeedwalk;
     #LINE QUIET {#MAP {FIND} {} {} {%1}};
     #LOCAL {length} {};
     #PATH {GET} {LENGTH} {length};
@@ -102,7 +143,12 @@
         #PATH {DESTROY};
     }; #ELSEIF {$length <= 100} {
         _here;
-        #PATH {RUN};
+        #IF {$MAPPER_RUN_DELAY} {
+            #PATH {RUN} {$MAPPER_RUN_DELAY};
+        }; #ELSE {
+            #NOP Even if the delay is zero, passing it affects the run logic.;
+            #PATH {RUN};
+        };
     }; #ELSE {
         _warn {GMCP Mapper: Room is too far away (> 100 rooms)};
         #PATH {DESTROY};
@@ -112,6 +158,10 @@
 #NOP Make the current room a house.;
 #ALIAS {_house} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #MAP {SET} {ROOMCOLOR} {<048>};
 };
 
@@ -120,6 +170,10 @@
 #NOP %2 - Description (if no default);
 #ALIAS {_shop} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #MAP {SET} {ROOMCOLOR} <168>;
     #MAP {SET} {ROOMSYMBOL} {%1};
 
@@ -140,6 +194,10 @@
 #NOP %2 - Description (if no default);
 #ALIAS {_trainer} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #MAP {SET} {ROOMCOLOR} {<158>};
     #MAP {SET} {ROOMSYMBOL} {%1};
 
@@ -157,6 +215,10 @@
 #NOP Make the current room a quest-giver.;
 #ALIAS {_quest} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #MAP {SET} {ROOMCOLOR} <138>;
     #MAP {SET} {ROOMSYMBOL} {Q};
 };
@@ -165,6 +227,10 @@
 #NOP %1 - Direction;
 #ALIAS {_hide} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #MAP {EXITFLAG} {%1} {HIDE};
 };
 
@@ -175,6 +241,10 @@
 #NOP %3 {w} to dig west, otherwise we dig east.;
 #ALIAS {_wall} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #NOP Get properties of current room.;
     #LOCAL {vnum} {};
     #LOCAL {roomdata} {};
@@ -233,6 +303,10 @@
 #NOP %1 Direction to move;
 #ALIAS {_mapMove} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #LOCAL {roomdata} {};
     #MAP {GET} {ROOMDATA} {roomdata};
     #IF {&roomdata[gmcp][exits][%1]} {
@@ -243,6 +317,10 @@
 #NOP Alias all movement directions to moving the map without actually moving.;
 #ALIAS {_aliasMovement} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #ALIAS {n} {_mapMove n};
     #ALIAS {ne} {_mapMove ne};
     #ALIAS {e} {_mapMove e};
@@ -258,6 +336,10 @@
 #NOP Remove all movement aliases;
 #ALIAS {_unaliasMovement} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #UNALIAS {n};
     #UNALIAS {ne};
     #UNALIAS {e};
@@ -274,19 +356,34 @@
 #ALIAS {_mapperReadMap} {
     #NOP %0;
     #MAP READ {$__base/game.mm/gmcp.map};
+    #VARIABLE {MAPPER_MAP_LOADED} {1};
+    #VARIABLE {MAPPER_MAP_ACTIVE} {1};
     _panelDraw {map};
 };
+
+#NOP Mark the map unloaded. The actual map may still be loaded, but we won't;
+#NOP Make any updates to it or write it to file.;
+#ALIAS {_mapperLeaveMap} {
+    #NOP %0;
+    #VARIABLE {MAPPER_MAP_ACTIVE} {0};
+}
 
 #NOP Write the map to file.;
 #ALIAS {_mapperWriteMap} {
     #NOP %0;
-    #MAP WRITE {$__base/game.mm/gmcp.map};
+    #IF {$MAPPER_MAP_ACTIVE} {
+        #MAP WRITE {$__base/game.mm/gmcp.map};
+    };
 };
 
 #NOP Event handler for receiving room info.;
 _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #ALIAS {__mapperReceivedRoomInfo} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #NOP Go to or create room.;
     #IF {!@__mapperGoToNewRoom{}} {
         #NOP not a real room, don't touch anything else.;
@@ -324,6 +421,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP %4 - Right coordinate;
 #ALIAS {_mapDraw} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #NOP Determine the current state of the VTMAP flag.;
     #LOCAL {mapFlags} {};
     #LINE {QUIET} {#LINE {CAPTURE} {mapFlags} {#MAP {FLAG};};};
@@ -352,8 +453,8 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
         #IF {"$__vtmapFlag" == "OFF"} {
             #DRAW {$BOX_COLOR} {$BOX_STYLE} {BOX} {%1} {%2} {%3} {%4};
             #MAP {OFFSET} {%1 + 1 + $MAP_TWEAK[TOP]} {%2 + 1 + $MAP_TWEAK[LEFT]} {%3 - 1 + $MAP_TWEAK[BOTTOM]} {%4 - 1 + $MAP_TWEAK[RIGHT]};
-            #MAP {FLAG} {ASCIIGRAPHICS} {ON};
-            #MAP {FLAG} {FAST} {OFF};
+            #NOP #MAP {FLAG} {ASCIIGRAPHICS} {ON};
+            #NOP #MAP {FLAG} {FAST} {OFF};
             #MAP {FLAG} {VTMAP} {ON};
         };
     };
@@ -361,6 +462,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 
 #NOP Go to or create a new room based on the contents of the GMCP data.;
 #FUNCTION {__mapperGoToNewRoom} {
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #IF {$GMCP[room][info][num] < 0} {
         #NOP The room isn't a real room. If we're doing manual mapping, we can;
         #NOP ignore that, because a new room will already have been created. ;
@@ -371,7 +476,15 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
         };
     }; #ELSE {
         #NOP Go to or create room.;
-        #MAP {GOTO} {$GMCP[room][info][num]} {DIG};
+        #IF {$MAPPER_MAP_ACTIVE} {
+            #MAP {GOTO} {$GMCP[room][info][num]} {DIG};
+        }; #ELSE {
+            #LOCAL {exists} {0};
+            #MAP {GET} {ROOMVNUM} {exists} {$GMCP[room][info][num]};
+            #IF {$exists} {
+                #MAP {GOTO} {$GMCP[room][info][num]};
+            };
+        };
     };
 
     #RETURN 1;
@@ -380,6 +493,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Update the mapper's exits for a room.;
 #ALIAS {__mapperUpdateExits} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #LOCAL {gmcpExit} {};
     #LOCAL {mapperExits} {};
     #LOCAL {mapperVnum} {};
@@ -418,6 +535,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Update room properties in the mapper.;
 #ALIAS {__mapperUpdateRoomProperties} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #NOP Check if the area has been set. If not, assume this is the first time;
     #NOP we've visited this room. The room may have just been created when we;
     #NOP landed in it, or might have been created as a stub when we entered an;
@@ -497,6 +618,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Save your current location to return later.;
 #ALIAS {_here} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #LOCAL {vnum} {};
     #MAP GET {ROOMVNUM} {vnum};
 
@@ -512,6 +637,11 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Return to your saved place.;
 #ALIAS {_return} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
+    _mapperStopSpeedwalk;
     #LOCAL {vnum} {};
     #LIST {PREVIOUS_LOCATIONS} {GET} {1} {vnum};
 
@@ -524,7 +654,13 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
             #IF {$length == 0} {
                 _warn {GMCP Mapper: Not found or already there};
             }; #ELSE {
-                #PATH {RUN};
+                #IF {$MAPPER_RUN_DELAY} {
+                    #PATH {RUN} {$MAPPER_RUN_DELAY};
+                }; #ELSE {
+                    #NOP Even if the delay is zero, passing it affects the run
+                    #NOP logic.;
+                    #PATH {RUN};
+                };
             };
         }; #ELSE {
             #PATH {DESTROY};
@@ -540,6 +676,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP %1 - direction to move to enter the maze.;
 #ALIAS {_enterUnknown} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #LOCAL {exits} {};
     #MAP {GET} {ROOMEXITS} {exits};
     #IF {&exits[%1] == 0} {
@@ -562,6 +702,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Stop operating in manual mapping mode.;
 #ALIAS {_exitUnknown} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #VARIABLE {MANUAL_MAP_MODE} {0};
     #MAP {FLAG} {NOFOLLOW} {ON};
     #MAP {FLAG} {STATIC} {ON};
@@ -570,6 +714,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Destroy all rooms created for randomized maze areas.;
 #ALIAS {_destroyUnknown} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #MAP {DESTROY} {AREA} {FAKE};
 };
 
@@ -577,9 +725,19 @@ _eventHandlerRegister {MAP ROOM SHORT-CLICKED MOUSE BUTTON ONE} {_mapperMapClick
 #NOP Handle map clicks.;
 #ALIAS {_mapperMapClicked} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #IF {$CLICK_TO_WALK} {
+        _mapperStopSpeedwalk;
         #MAP {FIND} {%5};
-        #PATH {RUN};
+        #IF {$MAPPER_RUN_DELAY} {
+            #PATH {RUN} {$MAPPER_RUN_DELAY};
+        }; #ELSE {
+            #NOP Even if the delay is zero, passing it affects the run logic.;
+            #PATH {RUN};
+        };
     };
 };
 
@@ -594,6 +752,10 @@ _eventHandlerRegister {SESSION DISCONNECTED} {_mapperWriteMap};
 _eventHandlerRegister {SHIP SCAN} {_mapperReceivedShipScan};
 #ALIAS {_mapperReceivedShipScan} {
     #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #VARIABLE {MAPPER_AWAITING_PROMPT} {1};
 };
 
@@ -610,6 +772,10 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
 
 #FUNCTION {_mapperFindCircle} {
     #NOP Figure out where the top of the map circle is.;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
     #LOCAL {mapTop} {0};
 
     #NOP If we just entered a room, look for the line that's part of the;
