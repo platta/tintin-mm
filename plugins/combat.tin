@@ -16,11 +16,11 @@
 #ACTION {You hit %1 %w%!{(?: times)?}, missing %3%!{(?: times)?} and %!{\w+} defends %4%!{(?: times)?}, leaving %!{\w+} at %5 percent. You are hit %6%!{(?: times)?}, are missed %7%!{(?: times)?}, and defend %8%!{(?: times)?}.} {
     #NOP %0;
     #LOCAL {youPercent} {};
-    #FORMAT {youPercent} {%f} {$GMCP[char][vitals][hp] / $GMCP[char][maxstats][maxhp] * 100};
+    #FORMAT {youPercent} {%f} {$GMCP[char][vitals][hp] / $GMCP[char][maxstats][maxhp] * 100.0};
     #FORMAT {youPercent} {<088>@_colorScale{$GMCP[char][vitals][hp]; $GMCP[char][maxstats][maxhp]}%d%% <088>} {$youPercent};
 
     #LOCAL {youDamageTaken} {};
-    #MATH {youDamageTaken} {($COMBAT_LAST_HP - $GMCP[char][vitals][hp]) / $GMCP[char][maxstats][maxhp] * 100};
+    #MATH {youDamageTaken} {($COMBAT_LAST_HP - $GMCP[char][vitals][hp]) / $GMCP[char][maxstats][maxhp] * 100.0};
     #IF {$youDamageTaken < 0} {
         #LOCAL {youDamageTaken} {0};
     };
