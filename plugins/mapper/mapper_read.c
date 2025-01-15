@@ -27,6 +27,8 @@ const char *COLORS[] = {
     "\x1b[38;5;124m",
     "\x1b[38;5;77m",
     "\x1b[38;5;132m",
+    "\x1b[38;5;117m",
+    "\x1b[38;5;71m",
 };
 
 const unsigned int ROOM_SIZE = sizeof(char) + sizeof(unsigned char);
