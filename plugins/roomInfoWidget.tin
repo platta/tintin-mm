@@ -5,6 +5,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {roomInfoWidget} {OPEN};
 
+_pluginCreate {roomInfo} {Creates a panel to show info about the current room};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Aliases;
 #NOP --------------------------------------------------------------------------;
@@ -177,6 +179,8 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomInfoWidgetUpdate};
 };
 
 _widgetCreate {roomInfoWidget} {_roomInfoWidgetDraw} {16} {3};
+
+_pluginCreatePanel {roomInfo} {roomInfo} {Room name, terrain info, compass rose}
 _panelCreate {roomInfo} {WIDGET} {roomInfoWidget};
 
 #CLASS {roomInfoWidget} {CLOSE};

@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {combat} {OPEN};
 
+_pluginCreate {combat} {Adds triggers to display formatted combat text};
+
 #NOP Track if it's the first round of combat. If it is, we can't track how much;
 #NOP damage was done between rounds, because there's no "previous" round.;
 #VARIABLE {COMBAT_FIRST_ROUND} {1};

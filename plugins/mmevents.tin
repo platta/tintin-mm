@@ -6,6 +6,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {mmevents} {OPEN};
 
+_pluginCreate {mmevents} {Custom events for mm-specific things like prompts};
+
 #NOP Standard prompt;
 _eventRegister {PROMPT};
 _eventRegister {STANDARD PROMPT};

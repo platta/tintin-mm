@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {roomDetailWidget} {OPEN};
 
+_pluginCreate {roomDetail} {Defines a room detail panel, MXP experimental};
+
 #NOP When we get GMCP room info, we immediately get vitals, and then we get;
 #NOP them again after the room output is done. If we track the arrival of thsoe;
 #NOP two vitals payloads after a room payload, we can capture the full game;
@@ -69,6 +71,8 @@ _eventHandlerRegister {PROMPT} {_roomDetailWidgetPrompt};
 
 _bufferCreate {roomDetailWidget} {0} {0} {1};
 _widgetCreate {roomDetailWidget} {_roomDetailWidgetDraw};
+
+_pluginCreatePanel {roomDetail} {roomDetail} {Room detail panel};
 _panelCreate {roomDetail} {WIDGET} {roomDetailWidget};
 
 _eventHandlerRegister {WIDGET CLICKED roomDetailWidget} {_roomDetailWidgetClickedHandler};

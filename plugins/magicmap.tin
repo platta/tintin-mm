@@ -1,6 +1,8 @@
 #NOP Class for feeding data to OOC MagicMap.;
 #CLASS {magicmap} {OPEN};
 
+_pluginCreate {magicmap} {Triggers to send data to magic map};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Aliases.;
 #NOP --------------------------------------------------------------------------;
@@ -8,6 +10,15 @@
 #NOP Send data to Magic Map.;
 #NOP %1 - The name of the GMCP event.;
 #NOP %2 - The GMCP payload.;
+_pluginCreateCommand
+    {magicmap}
+    {send}
+    {_magicMapSend}
+    {
+        {1} {Name of the GMCP event received}
+        {2} {GMCP payload}
+    }
+    {This command is generally meant to be used only by the triggers, but you could manually invoke it if you wanted.};
 #ALIAS {_magicMapSend} {
     #NOP %0;
     #LOCAL {sessionName} {magicmap.@__characterName{}};

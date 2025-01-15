@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {autowalk} {OPEN};
 
+_pluginCreate {autowalk} {Incomplete automatic walking plugin};
+
 #NOP Controls if auto-walk is enabled.;
 #VARIABLE {AUTOWALK} {0};
 

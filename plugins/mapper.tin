@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {mapper} {OPEN};
 
+_pluginCreate {map} {Mapping and navigation utilities};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Variables.;
 #NOP --------------------------------------------------------------------------;
@@ -98,6 +100,11 @@
 #NOP --------------------------------------------------------------------------;
 #NOP Functions.;
 #NOP --------------------------------------------------------------------------;
+_pluginCreateCommand
+    {map}
+    {stopSpeedwalk}
+    {_mapperStopSpeedwalk}
+    {Stop an in-progress speedwalk};
 #ALIAS {_mapperStopSpeedwalk} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -127,6 +134,15 @@
 
 #NOP Shortcut for finding a room by its description and moving there.;
 #NOP %1 - Room description to search.;
+_pluginCreateCommand
+    {map}
+    {go}
+    {_go}
+    {Go to a specified room by description or vnum}
+    {
+        {1} {Room description or vnum}
+    }
+    {This relies on room descriptions being set manually while mapping};
 #ALIAS {_go} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -152,6 +168,34 @@
     }; #ELSE {
         _warn {GMCP Mapper: Room is too far away (> 100 rooms)};
         #PATH {DESTROY};
+    };
+};
+
+_pluginCreateCommand
+    {map}
+    {mark}
+    {_mapperMark}
+    {Mark the current room as a certain type of room}
+    {
+        {1} {Type (house|shop|trainer|quest)}
+        {2} {Symbol (if reqruied by type)}
+        {3} {Custom description (when using a symbol that doesn't have a default description)}
+    };
+#ALIAS {_mapperMark} {
+    #NOP %0
+    #LOCAL {type} {};
+    #FORMAT {type} {%u} {%1};
+
+    #IF {"$type" == "HOUSE"} {
+        _house;
+    }; #ELSEIF {"$type" == "SHOP"} {
+        _shop %2 %3;
+    }; #ELSEIF {"$type" == "TRAINER"} {
+        _trainer %2 %3;
+    }; #ELSEIF {"$type" == "QUEST"} {
+        _quest;
+    }; #ELSE {
+        _error {Unknown mark type "$type"};
     };
 };
 
@@ -225,6 +269,15 @@
 
 #NOP Shorthand for hiding map exits.;
 #NOP %1 - Direction;
+_pluginCreateCommand
+    {map}
+    {hide}
+    {_hide}
+    {Mark an exit as hidden on the map.}
+    {
+        {1} {Exit direction to hide}
+    }
+    {When hiding an exit, the map will still show that an exit exists in that direction, but the rooms in that direction won't be shown until you move there.};
 #ALIAS {_hide} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -239,6 +292,17 @@
 #NOP %1 Room color.;
 #NOP %2 Room symbol.;
 #NOP %3 {w} to dig west, otherwise we dig east.;
+_pluginCreateCommand
+    {map}
+    {wall}
+    {_wall}
+    {Create a fake room in the wilderness to fill in a space that can't be reached}
+    {
+        {1} {Color code}
+        {2} {Symbol}
+        {3} {w to dig to the west, default is east}
+    }
+    {Now that there's a separate wilderness map, this should no longer be used.};
 #ALIAS {_wall} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -315,6 +379,11 @@
 };
 
 #NOP Alias all movement directions to moving the map without actually moving.;
+_pluginCreateCommand
+    {map}
+    {aliasMovement}
+    {_aliasMovement}
+    {Create aliases that allow you to move around the map without moving in-game};
 #ALIAS {_aliasMovement} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -334,6 +403,11 @@
 };
 
 #NOP Remove all movement aliases;
+_pluginCreateCommand
+    {map}
+    {unaliasMovement}
+    {_unaliasMovement}
+    {Remove aliases for being able to move around the map without moving in-game};
 #ALIAS {_unaliasMovement} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -353,6 +427,15 @@
 };
 
 #NOP Read the map from file.;
+_pluginCreateCommand
+    {map}
+    {load}
+    {_mapperReadMap}
+    {Load the map file from disk}
+    {
+        {1} {(0|1) Load in active mode (default 1)}
+    }
+    {When in active mode, updates to the map will be written to disk on disconnect. If you are playing multiple characters at once, only one should be in active mode, or else the map file could become corrupted.};
 #ALIAS {_mapperReadMap} {
     #NOP %0;
     #MAP READ {$__base/game.mm/gmcp.map};
@@ -361,14 +444,38 @@
     _panelDraw {map};
 };
 
+_pluginCreateCommand
+    {map}
+    {activate}
+    {_mapperActivate}
+    {Put the map in active mode}
+    {}
+    {When in active mode, updates to the map will be written to disk on disconnect. If you are playing multiple characters at once, only one should be in active mode, or else the map file could become corrupted.};
+#ALIAS {_mapperActivate} {
+    #NOP %0;
+    #VARIABLE {MAPPER_MAP_ACTIVE} {1};
+}
+
 #NOP Mark the map unloaded. The actual map may still be loaded, but we won't;
 #NOP Make any updates to it or write it to file.;
-#ALIAS {_mapperLeaveMap} {
+_pluginCreateCommand
+    {map}
+    {deactivate}
+    {_mapperDeactivate}
+    {Put the map in passive mode}
+    {}
+    {When in passive mode, the map will not be updated as you move to new rooms, and will not be written to disk on disconnect. If you are playing multiple characters at once, only one should be in active mode, or else the map file could become corrupted.};
+#ALIAS {_mapperDeactivate} {
     #NOP %0;
     #VARIABLE {MAPPER_MAP_ACTIVE} {0};
 }
 
 #NOP Write the map to file.;
+_pluginCreateCommand
+    {map}
+    {write}
+    {_mapperWriteMap}
+    {Write the map to disk}
 #ALIAS {_mapperWriteMap} {
     #NOP %0;
     #IF {$MAPPER_MAP_ACTIVE} {
@@ -616,6 +723,11 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 };
 
 #NOP Save your current location to return later.;
+_pluginCreateCommand
+    {map}
+    {here}
+    {_here}
+    {Push the current room onto the location stack so you can easily return later};
 #ALIAS {_here} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -635,6 +747,11 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
   };
 
 #NOP Return to your saved place.;
+_pluginCreateCommand
+  {map}
+  {return}
+  {_return}
+  {Pop the top location from the location stack and return to it};
 #ALIAS {_return} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -674,6 +791,15 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Enter one of the mazes that is randomized.;
 #NOP Call this when you're in the last real room before the maze.;
 #NOP %1 - direction to move to enter the maze.;
+_pluginCreateCommand
+    {map}
+    {enterTransient}
+    {_enterUnknown}
+    {Start mapping transient, changing areas}
+    {
+        {1} {The direction in which to create the first transient room}
+    }
+    {When entering transient mode, stand in the room outside the transient area, and enter transient mode in the direction of the maze/labrynth. Mapping in transient mode is based on the directional commands you send to the game, not the GMCP room information the game receives from the server. Be careful when moving while in transient mode, as you may create a bogus room by attempting to move in a direction that you can't actually move in.};
 #ALIAS {_enterUnknown} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -700,6 +826,13 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 };
 
 #NOP Stop operating in manual mapping mode.;
+_pluginCreateCommand
+    {map}
+    {exitTransient}
+    {_exitUnknown}
+    {Disable manual transient mapping}
+    {}
+    {You can disable transient mapping even if you're still in the transient area. This command just disables the creation of new rooms as you move.}
 #ALIAS {_exitUnknown} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -712,6 +845,11 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 };
 
 #NOP Destroy all rooms created for randomized maze areas.;
+_pluginCreateCommand
+    {map}
+    {wipeTransient}
+    {_destroyUnknown}
+    {Delete all transient rooms recorded on the map}
 #ALIAS {_destroyUnknown} {
     #NOP %0;
     #IF {!$MAPPER_MAP_LOADED} {
@@ -741,6 +879,7 @@ _eventHandlerRegister {MAP ROOM SHORT-CLICKED MOUSE BUTTON ONE} {_mapperMapClick
     };
 };
 
+_pluginCreatePanel {map} {map} {Panel for the map};
 _panelCreate {map} {MAP};
 
 #NOP --------------------------------------------------------------------------;

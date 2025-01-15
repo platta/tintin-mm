@@ -4,6 +4,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {vitalsWidget} {OPEN};
 
+_pluginCreate {vitals} {Creates a panel for displaying vitals};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Aliases;
 #NOP --------------------------------------------------------------------------;
@@ -125,6 +127,8 @@
 _widgetCreate {vitalsWidget} {_vitalsWidgetDraw} {15} {3};
 _eventHandlerRegister {IAC SB GMCP char.vitals IAC SE} {_vitalsWidgetUpdateCurrent};
 _eventHandlerRegister {IAC SB GMCP char.maxstats IAC SE} {_vitalsWidgetUpdateMax};
+
+_pluginCreatePanel {vitals} {HP/MP/SP bars};
 _panelCreate {vitals} {WIDGET} {vitalsWidget};
 
 #CLASS {vitalsWidget} {CLOSE};

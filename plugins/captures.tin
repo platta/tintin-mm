@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {captures} {OPEN};
 
+_pluginCreate {captures} {Triggers to capture various comms};
+
 #NOP --------------------------------------------------------------------------;
 #NOP User aliases.;
 #NOP --------------------------------------------------------------------------;
@@ -13,39 +15,51 @@
 #NOP Initialize buffers.;
 #NOP --------------------------------------------------------------------------;
 _bufferCreate {allTalk};
+_pluginCreatePanel {captures} {allTalk} {Messages from talking, yelling, shouting, and tells};
 _panelCreate {allTalk} {BUFFER} {allTalk};
 
 _bufferCreate {allClan};
+_pluginCreatePanel {captures} {allClan} {Messages from all clans (i.e. includes novice clan)};
 _panelCreate {allClan} {BUFFER} {allClan};
 
 _bufferCreate {clan} {1} {1};
+_pluginCreatePanel {captures} {clan} {Messages from your primary clan (i.e. does not include novice clan)};
 _panelCreate {clan} {BUFFER} {clan};
 
 _bufferCreate {novice};
+_pluginCreatePanel {captures} {novice} {Messages from the novice clan};
 _panelCreate {novice} {BUFFER} {novice};
 
 _bufferCreate {tells} {1} {1};
+_pluginCreatePanel {captures} {tells} {All tells you receive};
 _panelCreate {tells} {BUFFER} {tells};
 
 _bufferCreate {whispers};
+_pluginCreatePanel {captures} {whispers} {All whispers you receive};
 _panelCreate {whispers} {BUFFER} {whispers};
 
 _bufferCreate {form} {1} {1};
+_pluginCreatePanel {captures} {form} {All formation chatter};
 _panelCreate {form} {BUFFER} {form};
 
 _bufferCreate {says};
+_pluginCreatePanel {captures} {says} {Just standard conversation};
 _panelCreate {says} {BUFFER} {says};
 
 _bufferCreate {yells};
+_pluginCreatePanel {captures} {yells} {Just yells};
 _panelCreate {yells} {BUFFER} {yells};
 
 _bufferCreate {hints};
+_pluginCreatePanel {captures} {hints} {The in-game hints};
 _panelCreate {hints} {BUFFER} {hints};
 
 _bufferCreate {allied} {1} {1};
+_pluginCreatePanel {captures} {allied} {All alliance chatter};
 _panelCreate {allied} {BUFFER} {allied};
 
 _bufferCreate {chat};
+_pluginCreatePanel {captures} {chat} {All chatroom messages};
 _panelCreate {chat} {BUFFER} {chat};
 
 #NOP Chat management - for automatically creating new chat buffers.;
@@ -53,7 +67,8 @@ _panelCreate {chat} {BUFFER} {chat};
 #ALIAS {_newChat} {
     #NOP %0;
     #CLASS {captures} {OPEN};
-    _bufferCreate {%1};
+        _bufferCreate {%1};
+    _pluginCreatePanel {captures} {%1} {Messages for specific chatroom};
     _panelCreate {%1} {BUFFER} {%1};
     #CLASS {captures} {CLOSE};
 };

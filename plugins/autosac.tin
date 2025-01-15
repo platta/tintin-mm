@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {autosac} {OPEN};
 
+_pluginCreate {sac} {Auto-drop and auto-sacrifice utility};
+
 #NOP Automatically sacrifice severed limbs.;
 #VARIABLE {AUTOSAC_SEVERED} {1};
 
@@ -19,6 +21,30 @@
 #NOP --------------------------------------------------------------------------;
 
 #NOP Toggle automatic sacrifice of severed limbs.;
+_pluginCreateCommand
+    {sac}
+    {toggle}
+    {_autosacToggle}
+    {Toggle the automatic drop/sacrifice of items}
+    {
+        {1} {severed|junk|drop}
+    };
+#ALIAS {_autosacToggle} {
+    #NOP %0;
+    #LOCAL {val} {};
+    #FORMAT {val} {%u} {%1};
+
+    #IF {"$val" == "SEVERED"} {
+        _autosacToggleSevered;
+    }; #ELSEIF {"$val" == "JUNK"} {
+        _autosacToggleJunk;
+    }; #ELSEIF {"$val" == "DROP"} {
+        _autosacToggleDrop;
+    }; #ELSE {
+        _error {Invalid value, use severed|drop|junk};
+    };
+};
+
 #ALIAS {_autosacToggleSevered} {
     #IF {$AUTOSAC_SEVERED} {
         #VARIABLE {AUTOSAC_SEVERED} {0};
@@ -53,6 +79,14 @@
 
 #NOP Add an item to the junk list for sacrificing.;
 #NOP %1 - Item long description;
+_pluginCreateCommand
+    {sac}
+    {junk}
+    {_autosacJunk}
+    {Add a new item to the junk list}
+    {
+        {1} {Item long description}
+    };
 #ALIAS {_autosacJunk} {
     #IF {&AUTOSAC_JUNK_LIST[%1]} {
         _warn {'%1' is already on the junk list};
@@ -63,6 +97,14 @@
 
 #NOP Remove an item from the junk list for sacrificing.;
 #NOP %1 - Item long description;
+_pluginCreateCommand
+    {sac}
+    {unjunk}
+    {_autosacUnjunk}
+    {Remove an item from the junk list}
+    {
+        {1} {Item long description}
+    };
 #ALIAS {_autosacUnjunk} {
     #IF {!&AUTOSAC_JUNK_LIST[%1]} {
         _warn {'%1' not found on the junk list};
@@ -74,6 +116,14 @@
 
 #NOP Add an item to the drop list.;
 #NOP %1 - Item long description;
+_pluginCreateCommand
+    {sac}
+    {drop}
+    {_autosacDrop}
+    {Add a new item to the drop list}
+    {
+        {1} {Item long description}
+    };
 #ALIAS {_autosacDrop} {
     #IF {&AUTOSAC_DROP_LIST[%1]} {
         _warn {'%1' is already on the drop list};
@@ -85,6 +135,14 @@
 
 #NOP Remove an item from the drop list.;
 #NOP %1 - Item long description;
+_pluginCreateCommand
+    {sac}
+    {undrop}
+    {_autosacUndrop}
+    {Remove an item from the drop list}
+    {
+        {1} {Item long description}
+    };
 #ALIAS {_autosacUndrop} {
     #IF {!&AUTOSAC_DROP_LIST[%1]} {
         _warn {'%1' not found on the drop list};
