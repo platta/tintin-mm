@@ -3,6 +3,8 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {mm} {OPEN};
 
+_pluginCreate {mm} {Materia Magica base plugin};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Functions and Aliases the base class will call while trying to connect.;
 #NOP --------------------------------------------------------------------------;
@@ -79,6 +81,11 @@
 };
 
 #NOP Standard desktop layout.;
+_pluginCreateCommand
+    {mm}
+    {desktop}
+    {_desktopLayout}
+    {Apply standard desktop layout};
 #ALIAS {_desktopLayout} {
     #NOP %0;
     _splitSize {TOP} {16};
@@ -97,6 +104,11 @@
 };
 
 #NOP Standard mobile layout.;
+_pluginCreateCommand
+    {mm}
+    {mobile}
+    {_mobileLayout}
+    {Apply standard mobile layout};
 #ALIAS {_mobileLayout} {
     #NOP %0;
     _splitSize {TOP} {16};
