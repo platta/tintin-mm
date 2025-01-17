@@ -903,7 +903,11 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
     #NOP %0;
     #IF {$MAPPER_AWAITING_PROMPT} {
         #VARIABLE {MAPPER_AWAITING_PROMPT} {0};
-        #LOCAL {foo} {@_mapperFindCircle{}};
+
+        #NOP Don't update the wilderness map if we're not active.;
+        #IF {$MAPPER_MAP_ACTIVE} {
+            #LOCAL {foo} {@_mapperFindCircle{}};
+        };
 
         _eventFire {MAP UPDATED};
     };

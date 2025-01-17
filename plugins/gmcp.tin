@@ -11,6 +11,14 @@ _pluginCreate {gmcp} {Triggers to capture GMCP events and fire registered event 
 
 #NOP Send a GMCP request.;
 #NOP %1 - Request name.;
+_pluginCreateCommand
+    {gmcp}
+    {send}
+    {_gmcpSendRequest}
+    {Send a GMCP request}
+    {
+        {1} {Request}
+    };
 #ALIAS {_gmcpSendRequest} {
     #NOP %0;
     #SEND {$TELNET[IAC]$TELNET[SB]$TELNET[GMCP] %1 \{"":""\} $TELNET[IAC]$TELNET[SE]\};
