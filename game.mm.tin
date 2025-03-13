@@ -5,6 +5,16 @@
 
 _pluginCreate {mm} {Materia Magica base plugin};
 
+#NOP Variable to track keypad movement and make sure we're not sending move;
+#NOP commands faster than the game processes them when we're in manual mapping;
+#NOP mode. If we don't throttle this, the manual map can get corrupted.;
+#VARIABLE {MM_MOVE_AWAITING_PROMPT} {0};
+
+#NOP Variable to count the number of moves that have been input. For now, this;
+#NOP is a double check against the above protection, just in case. We'll see if;
+#NOP it ever actually gets tripped or not. If not maybe can remove it.;
+#VARIABLE {MM_MOVE_COUNTER} {0};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Functions and Aliases the base class will call while trying to connect.;
 #NOP --------------------------------------------------------------------------;
@@ -34,6 +44,9 @@ _pluginCreate {mm} {Materia Magica base plugin};
     _classLoad {vitalsWidget} {game.mm/plugins};
     _classLoad {roomDetailWidget} {game.mm/plugins};
     _classLoad {combat} {game.mm/plugins};
+
+    _eventHandlerRegister {PROMPT} {_mmPromptHandler};
+    _eventHandlerRegister {MOVEMENT BLOCKED} {__mmMovementBlocked};
 
     _keepalive;
 
@@ -141,118 +154,179 @@ _eventHandlerRegister {SESSION ACTIVATED} {_mmSessionActivatedHandler};
     };
 };
 
+
+#NOP Handle prompt;
+#ALIAS {_mmPromptHandler} {
+    #NOP %0;
+    #VARIABLE {MM_MOVE_AWAITING_PROMPT} {0};
+};
+
+#ALIAS {__mmMovementBlocked} {
+    #NOP %0;
+    #IF {$MANUAL_MAP_MODE && !$MAPPER_DIZZY} {
+        #MATH {MM_MOVE_COUNTER} {$MM_MOVE_COUNTER - 1};
+    };
+};
+
+#NOP Movement wrapper.;
+#ALIAS {_mmMove} {
+    #NOP %0;
+
+    #IF {$MANUAL_MAP_MODE} {
+        #IF {$MM_MOVE_AWAITING_PROMPT} {
+            _warn {SLOWWWWW DOWWWNNNNNNN};
+            _bell ring;
+            #RETURN;
+        };
+
+        #VARIABLE {MM_MOVE_AWAITING_PROMPT} {1};
+        #MATH {MM_MOVE_COUNTER} {$MM_MOVE_COUNTER + 1};
+
+        #LINE {IGNORE} {%1};
+
+        #IF {"%1" != "l" && "%1" != "look"} {
+            #MAP {MOVE} {%1};
+        };
+    }; #ELSE {
+      #LINE {IGNORE} {%1};
+    };
+};
+
+#ALIAS {^n$} {_mmMove {n};};
+#ALIAS {^ne$} {_mmMove {ne};};
+#ALIAS {^e$} {_mmMove {e};};
+#ALIAS {^se$} {_mmMove {se};};
+#ALIAS {^s$} {_mmMove {s};};
+#ALIAS {^sw$} {_mmMove {sw};};
+#ALIAS {^w$} {_mmMove {w};};
+#ALIAS {^nw$} {_mmMove {nw};};
+#ALIAS {^u$} {_mmMove {u};};
+#ALIAS {^d$} {_mmMove {d};};
+#ALIAS {^l$} {_mmMove {look};};
+#ALIAS {^look$} {_mmMove {look};};
+
 #NOP Numpad movement.;
-_eventHandlerRegister {NUMPAD 8} {_mmNumpad8Handler}
+_eventHandlerRegister {NUMPAD 8} {_mmNumpad8Handler};
 #ALIAS {_mmNumpad8Handler} {
     #NOP %0;
-    #SEND {north};
+    n;
 };
-_eventHandlerRegister {NUMPAD 9} {_mmNumpad9Handler}
+_eventHandlerRegister {NUMPAD 9} {_mmNumpad9Handler};
 #ALIAS {_mmNumpad9Handler} {
     #NOP %0;
-    #SEND {northeast};
+    ne;
 };
-_eventHandlerRegister {NUMPAD 6} {_mmNumpad6Handler}
+_eventHandlerRegister {NUMPAD 6} {_mmNumpad6Handler};
 #ALIAS {_mmNumpad6Handler} {
     #NOP %0;
-    #SEND {east};
+    e;
 };
-_eventHandlerRegister {NUMPAD 3} {_mmNumpad3Handler}
+_eventHandlerRegister {NUMPAD 3} {_mmNumpad3Handler};
 #ALIAS {_mmNumpad3Handler} {
     #NOP %0;
-    #SEND {southeast};
+    se;
 };
-_eventHandlerRegister {NUMPAD 2} {_mmNumpad2Handler}
+_eventHandlerRegister {NUMPAD 2} {_mmNumpad2Handler};
 #ALIAS {_mmNumpad2Handler} {
     #NOP %0;
-    #SEND {south};
+    s;
 };
-_eventHandlerRegister {NUMPAD 1} {_mmNumpad1Handler}
+_eventHandlerRegister {NUMPAD 1} {_mmNumpad1Handler};
 #ALIAS {_mmNumpad1Handler} {
     #NOP %0;
-    #SEND {southwest};
+    sw;
 };
-_eventHandlerRegister {NUMPAD 4} {_mmNumpad4Handler}
+_eventHandlerRegister {NUMPAD 4} {_mmNumpad4Handler};
 #ALIAS {_mmNumpad4Handler} {
     #NOP %0;
-    #SEND {west};
+    w;
 };
-_eventHandlerRegister {NUMPAD 7} {_mmNumpad7Handler}
+_eventHandlerRegister {NUMPAD 7} {_mmNumpad7Handler};
 #ALIAS {_mmNumpad7Handler} {
     #NOP %0;
-    #SEND {northwest};
+    nw;
 };
-_eventHandlerRegister {NUMPAD 5} {_mmNumpad5Handler}
+_eventHandlerRegister {NUMPAD 5} {_mmNumpad5Handler};
 #ALIAS {_mmNumpad5Handler} {
     #NOP %0;
-    #SEND {look};
+    look;
 };
-_eventHandlerRegister {NUMPAD PLUS} {_mmNumpadPlusHandler}
+_eventHandlerRegister {NUMPAD PLUS} {_mmNumpadPlusHandler};
 #ALIAS {_mmNumpadPlusHandler} {
     #NOP %0;
-    #SEND {up};
+    u;
 };
-_eventHandlerRegister {NUMPAD MINUS} {_mmNumpadMinusHandler}
+_eventHandlerRegister {NUMPAD MINUS} {_mmNumpadMinusHandler};
 #ALIAS {_mmNumpadMinusHandler} {
     #NOP %0;
-    #SEND {down};
+    d;
+};
+_eventHandlerRegister {NUMPAD 0} {_mmNumpad0Handler};
+#ALIAS {_mmNumpad0Handler} {
+    #NOP %0;
+    scan;
 };
 
 #NOP Numpad looking.;
-_eventHandlerRegister {NUMPAD ALT 8} {_mmNumpadAlt8Handler}
-#ALIAS {_mmNumpadAlt8Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 8} {_mmNumpadShift8Handler};
+#ALIAS {_mmNumpadShift8Handler} {
     #NOP %0;
     #SEND {look north};
 };
-_eventHandlerRegister {NUMPAD ALT 9} {_mmNumpadAlt9Handler}
-#ALIAS {_mmNumpadAlt9Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 9} {_mmNumpadShift9Handler};
+#ALIAS {_mmNumpadShift9Handler} {
     #NOP %0;
     #SEND {look northeast};
 };
-_eventHandlerRegister {NUMPAD ALT 6} {_mmNumpadAlt6Handler}
-#ALIAS {_mmNumpadAlt6Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 6} {_mmNumpadShift6Handler};
+#ALIAS {_mmNumpadShift6Handler} {
     #NOP %0;
     #SEND {look east};
 };
-_eventHandlerRegister {NUMPAD ALT 3} {_mmNumpadAlt3Handler}
-#ALIAS {_mmNumpadAlt3Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 3} {_mmNumpadShift3Handler};
+#ALIAS {_mmNumpadShift3Handler} {
     #NOP %0;
     #SEND {look southeast};
 };
-_eventHandlerRegister {NUMPAD ALT 2} {_mmNumpadAlt2Handler}
-#ALIAS {_mmNumpadAlt2Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 2} {_mmNumpadShift2Handler};
+#ALIAS {_mmNumpadShift2Handler} {
     #NOP %0;
     #SEND {look south};
 };
-_eventHandlerRegister {NUMPAD ALT 1} {_mmNumpadAlt1Handler}
-#ALIAS {_mmNumpadAlt1Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 1} {_mmNumpadShift1Handler};
+#ALIAS {_mmNumpadShift1Handler} {
     #NOP %0;
     #SEND {look southwest};
 };
-_eventHandlerRegister {NUMPAD ALT 4} {_mmNumpadAlt4Handler}
-#ALIAS {_mmNumpadAlt4Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 4} {_mmNumpadShift4Handler};
+#ALIAS {_mmNumpadShift4Handler} {
     #NOP %0;
     #SEND {look west};
 };
-_eventHandlerRegister {NUMPAD ALT 7} {_mmNumpadAlt7Handler}
-#ALIAS {_mmNumpadAlt7Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 7} {_mmNumpadShift7Handler};
+#ALIAS {_mmNumpadShift7Handler} {
     #NOP %0;
     #SEND {look northwest};
 };
-_eventHandlerRegister {NUMPAD ALT 5} {_mmNumpadAlt5Handler}
-#ALIAS {_mmNumpadAlt5Handler} {
+_eventHandlerRegister {NUMPAD SHIFT 5} {_mmNumpadShift5Handler};
+#ALIAS {_mmNumpadShift5Handler} {
     #NOP %0;
     #SEND {look};
 };
-_eventHandlerRegister {NUMPAD ALT PLUS} {_mmNumpadAltPlusHandler}
-#ALIAS {_mmNumpadAltPlusHandler} {
+_eventHandlerRegister {NUMPAD SHIFT PLUS} {_mmNumpadShiftPlusHandler};
+#ALIAS {_mmNumpadShiftPlusHandler} {
     #NOP %0;
     #SEND {look up};
 };
-_eventHandlerRegister {NUMPAD ALT MINUS} {_mmNumpadAltMinusHandler}
-#ALIAS {_mmNumpadAltMinusHandler} {
+_eventHandlerRegister {NUMPAD SHIFT MINUS} {_mmNumpadShiftMinusHandler}
+#ALIAS {_mmNumpadShiftMinusHandler} {
     #NOP %0;
     #SEND {look down};
+};
+_eventHandlerRegister {NUMPAD SHIFT 0} {_mmNumpadShift0Handler}
+#ALIAS {_mmNumpadShift0Handler} {
+    #NOP %0;
+    #SEND {inventory};
 };
 
 #CLASS {mm} {CLOSE};

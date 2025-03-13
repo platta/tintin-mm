@@ -303,7 +303,7 @@ _pluginCreate {mxp} {MXP support, incomplete};
 
         #LOCAL {i} {};
         #LOOP {1} {&element[attributes][]} {i} {
-            #LOCAL {attribute} {$element[attributes][$i]}
+            #LOCAL {attribute} {$element[attributes][$i]};
 
             #NOP Store blank value in case the regex doesn't match;
             #LOCAL {parsed[$attribute[name]]} {};

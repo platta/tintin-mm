@@ -28,6 +28,12 @@ _pluginCreate {map} {Mapping and navigation utilities};
 #NOP Flag to indicate if we're in "manual" mapping mode.;
 #VARIABLE {MANUAL_MAP_MODE} {0};
 
+#NOP Flag to indicate that we're in a dizzy room while manually mapping, so we;
+#NOP shouldn't update the current room when we see a new one.;
+#VARIABLE {MAPPER_DIZZY} {0};
+#VARIABLE {MAPPER_SAW_DIZZY} {0};
+#VARIABLE {MAPPER_RECEIVED_ROOM_MANUAL} {0};
+
 #NOP Stack of previous room numbers for fast travel.;
 #VARIABLE {PREVIOUS_LOCATIONS} {};
 
@@ -182,7 +188,7 @@ _pluginCreateCommand
         {3} {Custom description (when using a symbol that doesn't have a default description)}
     };
 #ALIAS {_mapperMark} {
-    #NOP %0
+    #NOP %0;
     #LOCAL {type} {};
     #FORMAT {type} {%u} {%1};
 
@@ -438,9 +444,17 @@ _pluginCreateCommand
     {When in active mode, updates to the map will be written to disk on disconnect. If you are playing multiple characters at once, only one should be in active mode, or else the map file could become corrupted.};
 #ALIAS {_mapperReadMap} {
     #NOP %0;
-    #MAP READ {$__base/game.mm/gmcp.map};
+    #LOCAL {active} {};
+    #IF {"%1" == "0"} {
+        #LOCAL {active} {0};
+    }; #ELSE {
+        #LOCAL {active} {1};
+    };
+
+    #MAP {READ} {$__base/game.mm/gmcp.map};
+    #MAP {GOTO} {1};
     #VARIABLE {MAPPER_MAP_LOADED} {1};
-    #VARIABLE {MAPPER_MAP_ACTIVE} {1};
+    #VARIABLE {MAPPER_MAP_ACTIVE} {$active};
     _panelDraw {map};
 };
 
@@ -487,7 +501,21 @@ _pluginCreateCommand
 _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #ALIAS {__mapperReceivedRoomInfo} {
     #NOP %0;
-    #IF {!$MAPPER_MAP_LOADED} {
+    #IF {$MANUAL_MAP_MODE} {
+        #IF {$GMCP[room][info][num] < 0} {
+            #VARIABLE {MAPPER_RECEIVED_ROOM_MANUAL} {1};
+            #IF {$MM_MOVE_COUNTER != 1} {
+                _warn {Received move counter other than 1: {$MM_MOVE_COUNTER}};
+                #VARIABLE {MM_MOVE_COUNTER} {0};
+                #RETURN;
+            };
+            #VARIABLE {MM_MOVE_COUNTER} {0};
+        }; #ELSE {
+            _map exitTransient;
+        };
+    };
+
+    #IF {!$MAPPER_MAP_LOADED || $MAPPER_DIZZY && !$MAPPER_SAW_DIZZY} {
         #RETURN;
     };
 
@@ -518,6 +546,26 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
         #NOP If we're not in the wilderness, fire the event to draw the map;
         #NOP now, since we're not doing anything else;
         _eventFire {MAP UPDATED};
+    };
+};
+
+_eventHandlerRegister {MOVEMENT BLOCKED} {__mapperMovementBlocked};
+#ALIAS {__mapperMovementBlocked} {
+    #NOP %0;
+    #IF {$MANUAL_MAP_MODE && !$MAPPER_DIZZY} {
+        _bell ring;
+        #MAP {UNDO};
+    };
+};
+
+_eventHandlerRegister {ENTERED DIZZY} {__mapperEnteredDizzy};
+#ALIAS {__mapperEnteredDizzy} {
+    #NOP %0;
+    #IF {$MANUAL_MAP_MODE} {
+        #VARIABLE {MAPPER_SAW_DIZZY} {1};
+        #IF {!$MAPPER_DIZZY && $MAPPER_RECEIVED_ROOM_MANUAL} {
+            _map dizzy;
+        };
     };
 };
 
@@ -553,8 +601,10 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
         #MATH {height} {%3 - %1 - 1};
 
         #LOCAL {result} {};
+        _debug {5};
         #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_read" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" ${GMCP[room][info][coord][x]} ${GMCP[room][info][coord][y]} $width $height};
         #DRAW {$BOX_COLOR} {$BOX_STYLE} {TALIGN} {BOX} {%1} {%2} {%3} {%4} $result[1..$height];
+        _debug {4};
 
     }; #ELSE {
         #IF {"$__vtmapFlag" == "OFF"} {
@@ -570,7 +620,7 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 #NOP Go to or create a new room based on the contents of the GMCP data.;
 #FUNCTION {__mapperGoToNewRoom} {
     #IF {!$MAPPER_MAP_LOADED} {
-        #RETURN;
+        #RETURN 0;
     };
 
     #IF {$GMCP[room][info][num] < 0} {
@@ -621,21 +671,43 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
 
         #NOP Don't do anything with fake rooms.;
         #IF {$GMCP[room][info][exits][$gmcpExit] < 0} {
-            #CONTINUE;
+            #IF {!$MANUAL_MAP_MODE} {
+                #CONTINUE;
+            };
+
+            #NOP Mapper doesn't know about this exit. Create it.;
+            #IF {!&mapperExits[$gmcpExit]} {
+                #NOP Dig in direction. May or may not be an existing room.;
+                #MAP {DIG} {$gmcpExit};
+
+                #NOP Read new exits.;
+                #LOCAL {newExits} {};
+                #MAP {GET} {ROOMEXITS} {newExits};
+
+                #NOP Check if dig created a room or not.;
+                #LOCAL {existing_area} {};
+                #MAP {GET} {ROOMAREA} {existing_area} {$newExits[$gmcpExit]};
+                #MATH {is_existing} {"$existing_area" != ""};
+
+                #IF {!$is_existing} {
+                    #NOP If dig created a new room, color it red.;
+                    #MAP {SET} {ROOMCOLOR} {<118>} {$newExits[$gmcpExit]};
+                };
+            };
+        }; #ELSE {
+            #NOP Mapper doesn't know about this exit. Create it.;
+            #IF {!&mapperExits[$gmcpExit]} {
+                #NOP Check if the room exists or not before we dig.;
+                #MAP {GET} {ROOMVNUM} {mapperVnum} {$GMCP[room][info][exits][$gmcpExit]};
+
+                #MAP {DIG} {$gmcpExit} {$GMCP[room][info][exits][$gmcpExit]};
+                #IF {$mapperVnum == 0}
+                {
+                    #NOP Mark unexplored rooms red.;
+                    #MAP {SET} {ROOMCOLOR} {<118>} {$GMCP[room][info][exits][$gmcpExit]}
+                };
+            };
         };
-
-        #NOP Mapper doesn't know about this exit. Create it.;
-        #IF {!&mapperExits[$gmcpExit]} {
-            #NOP Check if the room exists or not before we dig.;
-            #MAP {GET} {ROOMVNUM} {mapperVnum} {$GMCP[room][info][exits][$gmcpExit]};
-
-            #MAP {DIG} {$gmcpExit} {$GMCP[room][info][exits][$gmcpExit]};
-            #IF {$mapperVnum == 0}
-            {
-                #NOP Mark unexplored rooms red.;
-                #MAP {SET} {ROOMCOLOR} {<118>} {$GMCP[room][info][exits][$gmcpExit]}
-            }
-        }
     };
 };
 
@@ -650,9 +722,25 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
     #NOP we've visited this room. The room may have just been created when we;
     #NOP landed in it, or might have been created as a stub when we entered an;
     #NOP adjacent room.;
-    #LOCAL {is_existing} {};
-    #MAP {GET} {ROOMAREA} {is_existing};
-    #MATH {is_existing} {"$is_existing" != ""};
+    #LOCAL {existing_area} {};
+    #MAP {GET} {ROOMAREA} {existing_area};
+    #MATH {is_existing} {"$existing_area" != ""};
+
+    #IF {$GMCP[room][info][num] < 0} {
+        #NOP If this isn't a real room, we need to be careful about making;
+        #NOP updates to the map.;
+        #IF {!$MANUAL_MAP_MODE} {
+            #NOP If we're not in manual mapping mode, we definitely don't want;
+            #NOP to touch anything.;
+            #RETURN;
+        };
+
+        #NOP If we are in manual mapping mode, we want to make sure we're not;
+        #NOP sitting on an existing REAL room.;
+        #IF {"$existing_area" != "" && "$existing_area" != "FAKE"} {
+            #RETURN;
+        };
+    };
 
     #NOP Store all the gmcp room data in the room's INFO property.;
     #LOCAL {roomData} {};
@@ -667,7 +755,23 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__mapperReceivedRoomInfo};
             #MAP {SET} {ROOMCOLOR} <148>;
         }; #ELSE {
             #NOP This makes sure we kill the red color used for stub rooms.;
-            #MAP {SET} {ROOMCOLOR} <178>;
+
+            #NOP In manual mapping mode, color rooms with an up exit cyan, and;
+            #NOP rooms with a down exit magenta.;
+            #IF {$MANUAL_MAP_MODE} {
+                #LOCAL {exits} {};
+                #MAP {GET} {ROOMEXITS} {exits};
+
+                #IF {&exits[u] > 0} {
+                    #MAP {SET} {ROOMCOLOR} {<168>};
+                }; #ELSEIF {&exits[d] > 0} {
+                    #MAP {SET} {ROOMCOLOR} {<158>};
+                }; #ELSE {
+                    #MAP {SET} {ROOMCOLOR} <178>;
+                };
+            }; #ELSE {
+                #MAP {SET} {ROOMCOLOR} <178>;
+            };
         };
     };
 
@@ -774,7 +878,7 @@ _pluginCreateCommand
                 #IF {$MAPPER_RUN_DELAY} {
                     #PATH {RUN} {$MAPPER_RUN_DELAY};
                 }; #ELSE {
-                    #NOP Even if the delay is zero, passing it affects the run
+                    #NOP Even if the delay is zero, passing it affects the run;
                     #NOP logic.;
                     #PATH {RUN};
                 };
@@ -806,6 +910,11 @@ _pluginCreateCommand
         #RETURN;
     };
 
+    #IF {"%1" == ""} {
+        _error {No direction provided};
+        #RETURN;
+    };
+
     #LOCAL {exits} {};
     #MAP {GET} {ROOMEXITS} {exits};
     #IF {&exits[%1] == 0} {
@@ -818,6 +927,7 @@ _pluginCreateCommand
 
         #MAP {SET} {ROOMAREA} {FAKE} {$vnum};
         #MAP {SET} {ROOMDESC} {unknownexit} {$vnum};
+        #MAP {SET} {ROOMCOLOR} {<138>} {$vnum};
     };
 
     #VARIABLE {MANUAL_MAP_MODE} {1};
@@ -839,9 +949,62 @@ _pluginCreateCommand
         #RETURN;
     };
 
+    _info {Exiting manual mapping mode};
+
     #VARIABLE {MANUAL_MAP_MODE} {0};
+    #VARIABLE {MAPPER_DIZZY} {0};
+    #VARIABLE {MAPPER_SAW_DIZZY} {0};
+    #VARIABLE {MAPPER_RECEIVED_ROOM_MANUAL} {0};
     #MAP {FLAG} {NOFOLLOW} {ON};
     #MAP {FLAG} {STATIC} {ON};
+};
+
+#NOP Deal with a dizzy room in transient spaces.
+_pluginCreateCommand
+    {map}
+    {dizzy}
+    {_mapperDizzy}
+    {Pause manual mapping because you're stuck in a dizzy room};
+#ALIAS {_mapperDizzy} {
+    #NOP %0;
+    #IF {!$MANUAL_MAP_MODE} {
+        _warn {DIZZY: This function is only supported while manually mapping};
+        #RETURN;
+    };
+
+    #VARIABLE {MAPPER_DIZZY} {1};
+    #MAP {SET} {ROOMCOLOR} {<148>};
+    #MAP {SET} {ROOMSYMBOL} {?};
+    #MAP {FLAG} {NOFOLLOW} {ON};
+    #MAP {FLAG} {STATIC} {ON};
+};
+
+#NOP Undo the dizzy setting.;
+_pluginCreateCommand
+    {map}
+    {undizzy}
+    {_mapperUndizzy}
+    {Resume manual mapping after escaping a dizzy room}
+    {
+        {1} {Direction you moved from the dizzy room}
+    };
+#ALIAS {_mapperUndizzy} {
+    #NOP %0;
+    #IF {!$MANUAL_MAP_MODE} {
+        _warn {UNDIZZY: This function is only supported while manually mapping};
+        #RETURN;
+    };
+
+    #IF {"%1" == ""} {
+        _error {No direction provided};
+        #RETURN;
+    };
+
+    #VARIABLE {MAPPER_DIZZY} {0};
+    #MAP {FLAG} {NOFOLLOW} {OFF};
+    #MAP {FLAG} {STATIC} {OFF};
+
+    #MAP {MOVE} {%1};
 };
 
 #NOP Destroy all rooms created for randomized maze areas.;
@@ -888,6 +1051,16 @@ _panelCreate {map} {MAP};
 
 _eventHandlerRegister {SESSION DISCONNECTED} {_mapperWriteMap};
 
+_eventHandlerRegister {WIZARD EYE} {_mapperReceivedWizardEye};
+#ALIAS {_mapperReceivedWizardEye} {
+    #NOP %0;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
+    #VARIABLE {MAPPER_AWAITING_PROMPT} {1};
+};
+
 _eventHandlerRegister {SHIP SCAN} {_mapperReceivedShipScan};
 #ALIAS {_mapperReceivedShipScan} {
     #NOP %0;
@@ -901,6 +1074,15 @@ _eventHandlerRegister {SHIP SCAN} {_mapperReceivedShipScan};
 _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
 #ALIAS {_mapperReceivedPrompt} {
     #NOP %0;
+    #IF {$MANUAL_MAP_MODE && $MAPPER_RECEIVED_ROOM_MANUAL} {
+        #IF {$MAPPER_DIZZY && !$MAPPER_SAW_DIZZY} {
+            #NOP We're in dizzy mode but not in a dizzy room.;
+            _warn {You have exited the dizzy room. Use _map undizzy <direction> to set the map to the correct room and resume mapping!};
+        };
+        #VARIABLE {MAPPER_SAW_DIZZY} {0};
+        #VARIABLE {MAPPER_RECEIVED_ROOM_MANUAL} {0};
+    };
+
     #IF {$MAPPER_AWAITING_PROMPT} {
         #VARIABLE {MAPPER_AWAITING_PROMPT} {0};
 
@@ -908,8 +1090,10 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         #IF {$MAPPER_MAP_ACTIVE} {
             #LOCAL {foo} {@_mapperFindCircle{}};
         };
+        _debug {6};
 
         _eventFire {MAP UPDATED};
+        _debug {7};
     };
 };
 
@@ -930,11 +1114,15 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
     #LOCAL {shipScanLine} {0};
     #BUFFER {FIND} {^You climb up to the crow's nest of {.*} and look in every direction.$} {shipScanLine};
 
-    #IF {$roomLine == 0 && $shipScanLine == 0} {
+    #NOP If we just did wizard's eye, look for its message.;
+    #LOCAL {wizardEyeLine} {0};
+
+    #BUFFER {FIND} {%!{^(?:\e\[[0-9;]*m)+A glowing plane of light appears briefly before you:(?:\e\[[0-9;]*m)*}} {wizardEyeLine};
+    #IF {$roomLine == 0 && $shipScanLine == 0 && $wizardEyeLine == 0} {
         #RETURN;
     };
 
-    #IF {$roomLine > $shipScanLine} {
+    #IF {$roomLine > $shipScanLine && $roomLine > $wizardEyeLine} {
         #NOP If the room line is the most recent one, the map either starts;
         #NOP 2 or 3 lines below, depending on whether or not you have;
         #NOP superbrief turned on.;
@@ -947,10 +1135,13 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         #IF {"$mapCheck" === ""} {
             #MATH {mapTop} {$mapTop + 1};
         };
-    }; #ELSE {
+    }; #ELSEIF {$shipScanLine > $wizardEyeLine} {
         #NOP If the ship scan line is the most recent one, the map starts;
-        #NOP on the next line.;
+        #NOP on the next line.;1
         #MATH {mapTop} {$shipScanLine + 1};
+    }; #ELSE {
+        #NOP Otherwise, assume wizard eye.;
+        #MATH {mapTop} {$wizardEyeLine + 1};
     };
 
     #NOP Now we know where the top is. Start at the top and scan downards.;
@@ -1070,11 +1261,32 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         #LOCAL {bar} {};
         #MATH {bar} {$mapX + $foo};
 
+        #NOP Make these transformations before calling stringSkip because;
+        #NOP otherwise it'll break;
+        #REPLACE {line} {\x7B} {(};
+        #REPLACE {line} {\x7D} {)};
+
         #LOCAL {fooline} {@_stringSkip{{$line}; $foo}};
+
+        #NOP Make this transformation AFTER calling stringSkip because it;
+        #NOP changes the number of characters in the string.;
         #REPLACE {fooline} {"} {\"};
+
+        #NOP Leftover from attempts to make curly braces work.;
+        #NOP #REPLACE {line} {'} {'"'"'};
+        #NOP #REPLACE {line} {\} {\\\\};
+        #NOP #REPLACE {fooline} {\x7B} {\x7B};
+        #NOP #REPLACE {fooline} {\x7D} {\x7D};
 
         #LOCAL {result} {};
         #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$fooline"};
+
+        #NOP Leftover from attempts to make curly braces work.;
+        #NOP _debug {LINE=\$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "\$LINE"'};
+        #NOP #SCRIPT {result} {LINE=$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$LINE"'};
+        #NOP #SCRIPT {result} {bash -c 'LINE=$(echo -e "$fooline") bash -c '"'"'"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$LINE"'"'"''};
+        #NOP #SCRIPT {result} {LINE=\$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "\$LINE"'};
+        #NOP #ECHO {$result};
     };
 };
 

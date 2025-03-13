@@ -46,4 +46,40 @@ _eventRegister {SHIP SCAN};
     _eventFire {SHIP SCAN};
 };
 
+#NOP Wizard eye spell;
+_eventRegister {WIZARD EYE};
+#ACTION {^A glowing plane of light appears briefly before you:$} {
+    _eventFire {WIZARD EYE};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Movement events.
+#NOP --------------------------------------------------------------------------;
+
+#NOP Buffeted by winds.;
+_eventRegister {BUFFETED};
+#ACTION {^You are buffeted to the %1 by crosswinds!} {
+    #NOP %1 - direction;
+    _eventFire {BUFFETED} {%1};
+};
+
+#NOP Unable to move in the direction you tried.
+_eventRegister {MOVEMENT BLOCKED};
+#ACTION {^You cannot move in that direction.$} {
+    _eventFire {MOVEMENT BLOCKED};
+};
+#ACTION {^You attempt to open the %1 %2, but it is locked.$} {
+    _eventFire {MOVEMENT BLOCKED};
+};
+#ACTION {^PANIC! You couldn't escape!$} {
+    _eventFire {MOVEMENT BLOCKED};
+}
+
+#NOP Entered a dizzy room.;
+_eventRegister {ENTERED DIZZY};
+#ACTION {^You feel dizzy, and everything seems to spin around you.$} {
+    _eventFire {ENTERED DIZZY};
+};
+
+
 #CLASS {mmevents} {CLOSE};

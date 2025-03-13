@@ -8,13 +8,18 @@ _pluginCreate {sac} {Auto-drop and auto-sacrifice utility};
 #NOP Automatically sacrifice severed limbs.;
 #VARIABLE {AUTOSAC_SEVERED} {1};
 
+#NOP Wait for prompt so we don't flood the game.;
+#VARIABLE {AUTOSAC_WAITING_FOR_PROMPT} {0};
+
 #NOP Automatically sacrifice junk retrieved from corpses.;
 #VARIABLE {AUTOSAC_JUNK} {1};
 #VARIABLE {AUTOSAC_JUNK_LIST} {};
+#VARIABLE {AUTOSAC_JUNK_QUEUE} {};
 
 #NOP Automatically drop junk, but don't sacrifice.;
 #VARIABLE {AUTOSAC_DROP} {1};
 #VARIABLE {AUTOSAC_DROP_LIST} {};
+#VARIABLE {AUTOSAC_DROP_QUEUE} {};
 
 #NOP --------------------------------------------------------------------------;
 #NOP Aliases;
@@ -46,6 +51,7 @@ _pluginCreateCommand
 };
 
 #ALIAS {_autosacToggleSevered} {
+    #NOP %0;
     #IF {$AUTOSAC_SEVERED} {
         #VARIABLE {AUTOSAC_SEVERED} {0};
         _info {Automatic sacrifice of severed limbs is now OFF};
@@ -57,6 +63,7 @@ _pluginCreateCommand
 
 #NOP Toggle automatically sacrificing items in the junk list.;
 #ALIAS {_autosacToggleJunk} {
+    #NOP %0;
     #IF {$AUTOSAC_JUNK} {
         #VARIABLE {AUTOSAC_JUNK} {0};
         _info {Automatic sacrifice of junk items is now OFF};
@@ -68,6 +75,7 @@ _pluginCreateCommand
 
 #NOP Toggle automatically dropping items in the drop list.;
 #ALIAS {_autosacToggleDrop} {
+    #NOP %0;
     #IF {$AUTOSAC_DROP} {
         #VARIABLE {AUTOSAC_DROP} {0};
         _info {Automatic drop of junk items is now OFF};
@@ -88,8 +96,10 @@ _pluginCreateCommand
         {1} {Item long description}
     };
 #ALIAS {_autosacJunk} {
+    #NOP %0;
     #IF {&AUTOSAC_JUNK_LIST[%1]} {
         _warn {'%1' is already on the junk list};
+        #RETURN;
     };
     #VARIABLE {AUTOSAC_JUNK_LIST[%1]} {};
     _info {'%1' is now junk};
@@ -106,6 +116,7 @@ _pluginCreateCommand
         {1} {Item long description}
     };
 #ALIAS {_autosacUnjunk} {
+    #NOP %0;
     #IF {!&AUTOSAC_JUNK_LIST[%1]} {
         _warn {'%1' not found on the junk list};
         #RETURN;
@@ -125,6 +136,7 @@ _pluginCreateCommand
         {1} {Item long description}
     };
 #ALIAS {_autosacDrop} {
+    #NOP %0;
     #IF {&AUTOSAC_DROP_LIST[%1]} {
         _warn {'%1' is already on the drop list};
         #RETURN;
@@ -144,12 +156,226 @@ _pluginCreateCommand
         {1} {Item long description}
     };
 #ALIAS {_autosacUndrop} {
+    #NOP %0;
     #IF {!&AUTOSAC_DROP_LIST[%1]} {
         _warn {'%1' not found on the drop list};
         #RETURN;
     };
     #UNVARIABLE {AUTOSAC_DROP_LIST[%1]};
     _info {'%1' is no longer on the drop list};
+};
+
+#NOP Queue up the baron's currency to drop;
+_pluginCreateCommand
+    {sac}
+    {dropBaron}
+    {_autosacDropBaron}
+    {Add Baron's currency to the drop list};
+#ALIAS {_autosacDropBaron} {
+    #NOP %0;
+    _sac drop {a Baron's kippo};
+    _sac drop {a Baron's kottke};
+    _sac drop {a Baron's shmekzel};
+    _sac drop {a Baron's brosh};
+};
+
+#NOP Remove the baron's currency from the drop list;
+_pluginCreateCommand
+    {sac}
+    {undropBaron}
+    {_autosacUndropBaron}
+    {Remove Baron's currency from the drop list};
+#ALIAS {_audosacUndropBaron} {
+    #NOP %0;
+    _sac undrop {a Baron's kippo};
+    _sac undrop {a Baron's kottke};
+    _sac undrop {a Baron's shmekzel};
+    _sac drop {a Baron's brosh};
+};
+
+
+#NOP Junk PG garbage.
+_pluginCreateCommand
+    {sac}
+    {junkPG}
+    {_autosacJunkPG}
+    {Add PG junk to the junk list};
+#ALIAS {_autosacJunkPG} {
+    #NOP %0;
+    _sac junk {a fragmentation bomb};
+    _sac junk {a chipped blue orb};
+    _sac junk {a sickle shaped fellblade};
+    _sac junk {a crooked piece of wire};
+    _sac junk {a multi-faceted decanter};
+    _sac junk {a loaf of stale sesame bread};
+    _sac junk {a four-and-a-half-inch nail};
+    _sac junk {the chipped-off top middle corner of a cairnstone};
+    _sac junk {the capstone of a cairnstone};
+    _sac junk {a tunneling spade};
+    _sac junk {a stiff brown feather};
+    _sac junk {a violently fizzing potion};
+    _sac junk {a worn, soot-covered pickaxe};
+    _sac junk {the claws of a dungeon rat};
+    _sac junk {a hunk of swiss cheese};
+    _sac junk {a bottle of antidote};
+    _sac junk {a black skeleton key};
+    _sac junk {the flaming hide};
+    _sac junk {a heavy iron neck shackle};
+    _sac junk {a poisoned scorpion's tail};
+    _sac junk {the amber trance};
+    _sac junk {an evil cursed ankh};
+    _sac junk {a clear glass bauble};
+    _sac junk {a skin of life's blood};
+    _sac junk {a monk's war banner};
+    _sac junk {a rusty scimitar};
+    _sac junk {a hideous human skull};
+    _sac junk {several stale crackers};
+    _sac junk {the mad cap mushroom};
+    _sac junk {a crude wooden carving};
+    _sac junk {a tarnished brass lantern};
+    _sac junk {a tiny dagger};
+    _sac junk {a twisted wooden wand};
+    _sac junk {a potion, sparkling of many colors};
+    _sac junk {a thin crisp of wheat};
+    _sac junk {a dusty curious coin};
+    _sac junk {a bone from a gravedancer};
+    _sac junk {a pair of brass spectacles};
+};
+
+#NOP Unjunk PG garbage.
+_pluginCreateCommand
+    {sac}
+    {unjunkPG}
+    {_autosacUnjunkPG}
+    {Remove PG junk from the junk list};
+#ALIAS {_autosacUnjunkPG} {
+    #NOP %0;
+    _sac unjunk {a fragmentation bomb};
+    _sac unjunk {a chipped blue orb};
+    _sac unjunk {a sickle shaped fellblade};
+    _sac unjunk {a crooked piece of wire};
+    _sac unjunk {a multi-faceted decanter};
+    _sac unjunk {a loaf of stale sesame bread};
+    _sac unjunk {a four-and-a-half-inch nail};
+    _sac unjunk {the chipped-off top middle corner of a cairnstone};
+    _sac unjunk {the capstone of a cairnstone};
+    _sac unjunk {a tunneling spade};
+    _sac unjunk {a stiff brown feather};
+    _sac unjunk {a violently fizzing potion};
+    _sac unjunk {a worn, soot-covered pickaxe};
+    _sac unjunk {the claws of a dungeon rat};
+    _sac unjunk {a hunk of swiss cheese};
+    _sac unjunk {a bottle of antidote};
+    _sac unjunk {a black skeleton key};
+    _sac unjunk {the flaming hide};
+    _sac unjunk {a heavy iron neck shackle};
+    _sac unjunk {a poisoned scorpion's tail};
+    _sac unjunk {the amber trance};
+    _sac unjunk {an evil cursed ankh};
+    _sac unjunk {a clear glass bauble};
+    _sac unjunk {a skin of life's blood};
+    _sac unjunk {a monk's war banner};
+    _sac unjunk {a rusty scimitar};
+    _sac unjunk {a hideous human skull};
+    _sac unjunk {several stale crackers};
+    _sac unjunk {the mad cap mushroom};
+    _sac unjunk {a crude wooden carving};
+    _sac unjunk {a tarnished brass lantern};
+    _sac unjunk {a tiny dagger};
+    _sac unjunk {a twisted wooden wand};
+    _sac unjunk {a potion, sparkling of many colors};
+    _sac unjunk {a thin crisp of wheat};
+    _sac unjunk {a dusty curious coin};
+    _sac unjunk {a bone from a gravedancer};
+    _sac unjunk {a pair of brass spectacles};
+};
+
+#NOP Junk mandrake garbage.;
+_pluginCreateCommand
+    {sac}
+    {junkMandrake}
+    {_autosacJunkMandrake}
+    {Add Mandrake junk to the junk list};
+#ALIAS {_autosacJunkMandrake} {
+    #NOP %0;
+    _sac junk {a rotten old tree branch};
+    _sac junk {a long, sharp stick};
+};
+
+#NOP Ununk mandrake garbage.;
+_pluginCreateCommand
+    {sac}
+    {unjunkMandrake}
+    {_autosacUnjunkMandrake}
+    {Remove Mandrake junk from the junk list};
+#ALIAS {_autosacUnjunkMandrake} {
+    #NOP %0;
+    _sac unjunk {a rotten old tree branch};
+    _sac unjunk {a long, sharp stick};
+};
+
+_pluginCreateCommand
+    {sac}
+    {junkLasler}
+    {_autosacJunkLasler}
+    {Add Lasler junk to the junk list};
+#ALIAS {_autosacJunkLasler} {
+    #NOP %0;
+    _sac junk {a cedar nunchaku};
+
+};
+
+_pluginCreateCommand
+    {sac}
+    {unjunkLasler}
+    {_autosacunjunkLasler}
+    {Remove Lasler junk from the junk list};
+#ALIAS {_autosacunJunkLasler} {
+    #NOP %0;
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Tickers.
+#NOP --------------------------------------------------------------------------;
+
+#TICKER {AUTOSAC_TICKER} {
+    #IF {$AUTOSAC_WAITING_FOR_PROMPT} {
+        #RETURN;
+    };
+
+    #IF {&AUTOSAC_JUNK_QUEUE[] > 0} {
+        #LOCAL {item} {};
+        #LIST {AUTOSAC_JUNK_QUEUE} {GET} 1 {item};
+        drop "$item";
+        sacrifice "$item";
+        #LIST {AUTOSAC_JUNK_QUEUE} {DELETE} {1};
+
+        #IF {&AUTOSAC_JUNK_QUEUE[] == 0} {
+            _info {Junk queue is empty};
+        }; #ELSE {
+            #VARIABLE {AUTOSAC_WAITING_FOR_PROMPT} {1};
+        };
+    }; #ELSEIF {&AUTOSAC_DROP_QUEUE[] > 0} {
+        #LOCAL {item} {};
+        #LIST {AUTOSAC_DROP_QUEUE} {GET} 1 {item};
+        drop "$item";
+        #LIST {AUTOSAC_DROP_QUEUE} {DELETE} {1};
+
+        #IF {&AUTOSAC_DROP_QUEUE[] == 0} {
+            _info {Drop queue is empty};
+        }; #ELSE {
+            #VARIABLE {AUTOSAC_WAITING_FOR_PROMPT} {1};
+        };
+    };
+} {0.1};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Events.;
+#NOP --------------------------------------------------------------------------;
+_eventHandlerRegister {PROMPT} {_autosacReceivedPrompt};
+#ALIAS {_autosacReceivedPrompt} {
+    #NOP %0;
+    #VARIABLE {AUTOSAC_WAITING_FOR_PROMPT} {0};
 };
 
 #NOP --------------------------------------------------------------------------;
@@ -170,18 +396,15 @@ _pluginCreateCommand
     #IF {$AUTOSAC_JUNK && &AUTOSAC_JUNK_LIST[%1] > 0} {
         #LOCAL {i} {};
         #LOOP {1} {%2} {i} {
-            #DELAY {0.05 * $i} {
-                drop "%1";
-                sacrifice "%1";
-            };
+            #LIST {AUTOSAC_JUNK_QUEUE} {ADD} {%1};
         };
+        #VARIABLE {AUTOSAC_WAITING_FOR_PROMPT} {1};
       }; #ELSEIF {$AUTOSAC_DROP && &AUTOSAC_DROP_LIST[%1] > 0} {
         #LOCAL {i} {};
         #LOOP {1} {%2} {i} {
-            #DELAY {0.05 * $i} {
-                drop "%1";
-            };
+            #LIST {AUTOSAC_DROP_QUEUE} {ADD} {%1};
         };
+        #VARIABLE {AUTOSAC_WAITING_FOR_PROMPT} {1};
       };
 };
 

@@ -1,0 +1,87 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Water Stability Plugin;
+#NOP Automatically move back when you get buffeted by crosswinds.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {waterstability} {OPEN};
+
+_pluginCreate {water} {Stabilitze your position in water};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Variables;
+#NOP --------------------------------------------------------------------------;
+
+#VARIABLE {WATER_STABILIZE} {0};
+
+#VARIABLE {WATER_COMMAND} {};
+
+#VARIABLE {WATER_OPPOSITE_DIRECTIONS} {
+    {north} {south}
+    {northeast} {southwest}
+    {east} {west}
+    {southeast} {northwest}
+    {south} {north}
+    {southwest} {northeast}
+    {west} {east}
+    {northwest} {southeast}
+}
+
+#NOP --------------------------------------------------------------------------;
+#NOP Aliases;
+#NOP --------------------------------------------------------------------------;
+
+_pluginCreateCommand
+    {water}
+    {enable}
+    {_waterStabilityEnable}
+    {Enable the water stability trigger};
+#ALIAS {_waterStabilityEnable} {
+    #NOP %0;
+    _info {Enabling water stabilization trigger};
+    #VARIABLE {WATER_STABILIZE} {1};
+};
+
+_pluginCreateCommand
+    {water}
+    {disable}
+    {_waterStabilityDisable}
+    {Disable the water stability trigger};
+#ALIAS {_waterStabilityDisable} {
+    #NOP %0;
+    _info {Disabling water stabilization trigger};
+    #VARIABLE {WATER_STABILIZE} {0};
+};
+
+_pluginCreateCommand
+    {water}
+    {setCommand}
+    {_waterStabilitySetCommand}
+    {Set the command to run after compensating for being buffeted}
+    {
+        {1} {Command to invoke}
+    };
+#ALIAS {_waterStabilitySetCommand} {
+    #NOP %0;
+    _info {Setting post-stabilization command to %1};
+    #VARIABLE {WATER_COMMAND} {%1};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Events;
+#NOP --------------------------------------------------------------------------;
+
+_eventHandlerRegister {BUFFETED} {_waterStabilityBuffetedHandler};
+#ALIAS {_waterStabilityBuffetedHandler} {
+    #NOP %0;
+    #IF {$WATER_STABILIZE == 0} {
+        #RETURN;
+    };
+
+    _debug {Buffeted %1, moving $WATER_OPPOSITE_DIRECTIONS[%1] to compensate};
+    #SEND {$WATER_OPPOSITE_DIRECTIONS[%1]};
+    #IF {"$WATER_COMMAND" != ""} {
+        _debug {Executing post-stabilization command: $WATER_COMMAND};
+        #SEND {$WATER_COMMAND};
+    };
+};
+
+#CLASS {waterstability} {CLOSE};
