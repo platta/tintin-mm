@@ -2,177 +2,183 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-const char *COLORS[] = {
-    "\x1b[0m",
-    "\x1b[38;5;10m",
-    "\x1b[38;5;11m",
-    "\x1b[38;5;12m",
-    "\x1b[38;5;13m",
-    "\x1b[38;5;14m",
-    "\x1b[38;5;15m",
-    "\x1b[38;5;1m",
-    "\x1b[38;5;2m",
-    "\x1b[38;5;3m",
-    "\x1b[38;5;4m",
-    "\x1b[38;5;5m",
-    "\x1b[38;5;6m",
-    "\x1b[38;5;7m",
-    "\x1b[38;5;8m",
-    "\x1b[38;5;9m",
-    "\x1b[38;5;31m",
-    "\x1b[38;5;19m",
-    "\x1b[38;5;163m",
-    "\x1b[38;5;21m",
-    "\x1b[38;5;185m",
-    "\x1b[38;5;124m",
-    "\x1b[38;5;77m",
-    "\x1b[38;5;132m",
-    "\x1b[38;5;117m",
-    "\x1b[38;5;71m",
-};
-
-const unsigned int ROOM_SIZE = sizeof(char) + sizeof(unsigned char);
+#include "lib/mapinfo.h"
+#include "lib/roominfo.h"
 
 int main(int argc, char *argv[]) {
-    // const int shortSize = sizeof(short);
-    // const short symbolSize = sizeof(char);
-    // const short colorSize = sizeof(short);
-    // const short roomSize = symbolSize + colorSize;
-
-    // Assume the args are in the right positions.
+    // Read arguments.
+    // File containing the map.
     const char *file = argv[1];
-    const int x = strtol(argv[2], NULL, 10) - 1;
-    const int y = strtol(argv[3], NULL, 10) - 1;
+
+    // Player's current x and y position.
+    const int x = strtol(argv[2], NULL, 10);
+    const int y = strtol(argv[3], NULL, 10);
+
+    // Width and height of the map to print (player is always assumed to be in
+    // the middle of the map that is printed).
     const int width = strtol(argv[4], NULL, 10);
     const int height = strtol(argv[5], NULL, 10);
 
-    // Calculate bounding box.
+    // Calculate the map coordinates of the area we will print. Using floor to
+    // deal with widths/heights that don't divide evenly.
     const int top = y - floor((height - 1) / 2.0);
     const int bottom = top + height;
     const int left = x - floor((width - 1) / 2.0);
     const int right = left + width;
 
-    // printf("\x1b[38;5;1mCOLOR TEST\x1b[0m\n");
-    // char *foo = "\x1b[38;5;1m";
-    // printf("%lu\n", sizeof(short));
-
-    // char *bar = "\x1b[38;5;1m";
-    // printf("%s\n", bar);
-    // printf("%lu\n", strlen(bar));
-
-    // union
-    // {
-    //     int i;
-    //     char c[sizeof(int)];
-    // } q;
-    // q.i = 1;
-    // if (q.c[0] == 1)
-    //     printf("little-endian\n");
-    // else
-    //     printf("big-endian\n");
-
+    // Open the map file in read mode
     FILE *fptr;
-
-    // Open a file in read mode
     fptr = fopen(file, "rb");
 
-    // Read the first 4 bytes to see what the max dimension of the map is.
-    unsigned short mapSize;
-    fread(&mapSize, sizeof(unsigned short), 1, fptr);
+    MapInfo *map = malloc(sizeof(MapInfo));
+    read_map_info(map, fptr);
 
-    // for (int i = 0; i < 10; i++)
-    // {
-    //     fread(&mapSize, 3, 1, fptr);
-    //     printf("%u", mapSize);
-    // }
-    const int rowSize = mapSize * ROOM_SIZE;
+    // This stores the color of the previous character we printed, so we won't
+    // print color codes for every single character, only when the color changes
+    // or we start a new line.
+    unsigned char previousColor;
 
-    // The number of bits required to represent the x or y coordinate, and we
-    // need that in order to create the packed address.
-    // short bitCount = ceil(log2(mapSize));
-
-    // printf("Max Size: %i\n", mapSize);
-    // printf("Bit Count: %i\n", bitCount);
-    // printf("Room Size: %i\n", ROOM_SIZE);
-    // for (int i = 0; i < mapSize; i++)
-    // {
-    //     for (int j = 0; j < mapSize; j++)
-    //     {
-    //         // printf("%i %i: (%i * %i) + (%i * %i) + %u = %i\n", i, j, i,
-    //         rowSize, j, roomSize, shortSize, i * rowSize + j * roomSize +
-    //         shortSize); printf("%i %i: (%d + %i) * %i + %u = %u\n", i, j, i <<
-    //         bitCount, j, roomSize, shortSize, ((i << bitCount) | j) * roomSize
-    //         + shortSize);
-    //     }
-    // }
-
-    // return 0;
-
-    // For calculating the address of stuff.
-    char symbol;
-    unsigned char color;
-    unsigned char currentColor;
-
-    int currentY = top;
-    int currentX;
-    while (currentY < 0 && currentY++ < bottom) {
-        printf("\x1b[0m\n");
-    }
-
-    for (currentY; currentY < bottom; currentY++) {
-        while (currentY >= mapSize && currentY++ < bottom) {
-            printf("\x1b[0m\n");
-        }
-        currentX = left;
-        while (currentX < 0 && currentX++ < right) {
-            printf(" ");
-        }
-
-        currentColor = 0;
-
-        // Go to the first item we want for this row.
-        if (fseek(fptr, (currentY * mapSize + currentX) * ROOM_SIZE + sizeof(unsigned short), SEEK_SET) != 0)
-        // if (fseek(fptr, ((currentY << bitCount) | left) * roomSize + shortSize,
-        // SEEK_SET) != 0)
-        {
-            printf("\x1b[0m\n");
+    bool seek;
+    int rawX, rawY;
+    int wrappedY, wrappedX;
+    RoomInfo *room = malloc(sizeof(RoomInfo));
+    for (rawY = top; rawY < bottom; rawY++) {
+        if (!wrap_y(map, rawY, &wrappedY)) {
+            printf("\n");
             continue;
         }
 
-        // printf("ROW START %u, %u: %lu\n", currentY, currentX, ftell(fptr));
+        previousColor = 0;
+        seek = true;
 
-        for (currentX; currentX < right; currentX++) {
-            if (currentX >= mapSize) {
-                break;
-            }
-            if (currentY == y && currentX == x) {
-                symbol = '@';
-                color = 4;
-
-                fseek(fptr, ROOM_SIZE, SEEK_CUR);
-            } else if (fread(&symbol, sizeof(char), 1, fptr) == 0 || fread(&color, sizeof(unsigned char), 1, fptr) == 0 || !symbol) {
-                symbol = ' ';
-                color = currentColor;
+        for (rawX = left; rawX < right; rawX++) {
+            if (!wrap_x(map, rawX, &wrappedX)) {
+                if (rawX < 0) {
+                    printf(" ");
+                    continue;
+                } else {
+                    break;
+                }
             }
 
-            if (color != currentColor) {
-                currentColor = color;
-                printf("%s", COLORS[currentColor]);
+            if (seek) {
+                // printf("s");
+                if (!seek_room(map, wrappedX, wrappedY, fptr)) {
+                    break;
+                }
+                seek = false;
             }
-            printf("%c", symbol);
+
+            if (map->hwrap && wrappedX == map->width - 1) {
+                seek = true;
+            }
+
+            if (!read_room(room, fptr)) {
+                room->symbol = ' ';
+            }
+
+            if (wrappedX == x && wrappedY == y) {
+                room->symbol = '@';
+                room->color = 13;
+            }
+            // printf("-%d_%d_%d-", wrappedX, wrappedY, ftell(fptr));
+            if (previousColor != room->color) {
+                if (room->color == 0) {
+                    printf("\x1b[0m");
+                } else {
+                    printf("\x1b[38;5;%dm", room->color);
+                }
+                previousColor = room->color;
+            }
+            // printf("Room (%2d, %2d): %d\n", wrappedX, wrappedY, ftell(fptr));
+            printf("%c", room->symbol);
+
+            // printf("(%2d, %2d) ", wrappedX, wrappedY);
         }
 
         printf("\x1b[0m\n");
     }
 
-    // // Store the content of the file
-    // char myString[100];
+    // // Iterator variables. Start at the top of the bounding box.
+    // int currentY = top;
+    // int currentX;
 
-    // // Read the content and store it inside myString
-    // fgets(myString, 100, fptr);
+    // // Deal with being close to the top of the map where we need to represent
+    // // "negative" Y coordinates. Get us to the first real row of map data.
+    // while (currentY < 0 && currentY++ < bottom) {
+    //     printf("\x1b[0m\n");
+    // }
 
-    // // Print the file content
-    // printf("%s", myString);
+    // // Loop over rows.
+    // for (currentY; currentY < bottom; currentY++) {
+    //     if (currentY >= mapHeight) {
+    //         // Deal with being close to the bottom of the map where we need to
+    //         // represent Y coordinates past the maximum Y. Print blank rows
+    //         // until we're done.
+    //         while (currentY >= mapHeight && currentY++ < bottom) {
+    //             printf("\x1b[0m\n");
+    //         }
+    //         break;
+    //     }
+
+    //     // Start at the left X coordinate.
+    //     currentX = left;
+    //     while (currentX < 0 && currentX++ < right) {
+    //         // Deal with being close to the left of the map where we need to
+    //         // represent "negative" X coordinates. Get us to the first real X
+    //         // coordinate in map data.
+    //         printf(" ");
+    //     }
+
+    //     previousColor = 0;
+
+    //     // Go to the first item we want for this row. We seek based on the size
+    //     // Of the map dimensions at the beginning of the file plus how many
+    //     // rooms into the map we are. Which is y * mapWidth + x rooms.
+    //     if (fseek(fptr, 64 * sizeof(unsigned short) + (currentY * mapWidth + currentX) * ROOM_SIZE, SEEK_SET) != 0) {
+    //         // Print a blank row if we can't seek here in the file.
+    //         printf("\x1b[0m\n");
+    //         continue;
+    //     }
+
+    //     // Loop over x coordinates for this row.
+    //     for (currentX; currentX < right; currentX++) {
+    //         if (currentX >= mapWidth) {
+    //             // Stop if we hit the end of the map.
+    //             break;
+    //         }
+    //         if (currentY == y && currentX == x) {
+    //             // This is the player's location, print @ instead of the
+    //             // terrain character.
+    //             symbol = '@';
+    //             color = 13;
+
+    //             // Manually advance the file pointer since we're not reading the
+    //             // data at this coordinate.
+    //             fseek(fptr, ROOM_SIZE, SEEK_CUR);
+    //         } else if (fread(&symbol, sizeof(char), 1, fptr) == 0 || fread(&color, sizeof(unsigned char), 1, fptr) == 0 || !symbol) {
+    //             // Handle no data found. Print a blank space and keep the
+    //             // current color.
+    //             symbol = ' ';
+    //             color = previousColor;
+    //         }
+
+    //         if (color != previousColor) {
+    //             // If the color changed, output the escape code for the new one.
+    //             previousColor = color;
+    //             if (previousColor > 0) {
+    //                 printf("\x1b[38;5;%dm", previousColor);
+    //             } else {
+    //                 printf("\x1b[38;5;%dm", previousColor);
+    //             }
+    //         }
+    //         // Print the symbol.
+    //         printf("%c", symbol);
+    //     }
+
+    //     // When we're all done, reset colors and end this line.
+    //     printf("\x1b[0m\n");
+    // }
 
     // Close the file
     fclose(fptr);
