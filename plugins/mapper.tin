@@ -1137,7 +1137,7 @@ _eventHandlerRegister {PROMPT} {_mapperReceivedPrompt};
         };
     }; #ELSEIF {$shipScanLine > $wizardEyeLine} {
         #NOP If the ship scan line is the most recent one, the map starts;
-        #NOP on the next line.;1
+        #NOP on the next line.;
         #MATH {mapTop} {$shipScanLine + 1};
     }; #ELSE {
         #NOP Otherwise, assume wizard eye.;

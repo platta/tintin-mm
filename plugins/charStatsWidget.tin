@@ -1,0 +1,111 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Character stats widget;
+#NOP Shows experience info.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {charStatsWidget} {OPEN};
+
+_pluginCreate {charStats} {Creates a panel to show character stats};
+
+#NOP Update widget data with char stats.;
+_eventHandlerRegister {IAC SB GMCP char.status IAC SE} {_charStatsWidgetUpdateStats};
+#ALIAS {_charStatsWidgetUpdateStats} {
+    #NOP %0;
+    #LOCAL {data} {@_widgetGetData{{charStatsWidget}}};
+
+    #LOCAL {data[exp]} {
+        {level} {$GMCP[char][status][level]}
+        {totallevel} {$GMCP[char][status][totallevel]}
+        {tnl} {$GMCP[char][status][tnl]}
+        {tnlpct} {$GMCP[char][status][tnlpct]}
+    };
+
+    _widgetUpdateData {charStatsWidget} {$data};
+};
+
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_charStatsWidgetUpdateCoords};
+#ALIAS {_charStatsWidgetUpdateCoords} {
+    #NOP %0;
+    #LOCAL {data} {@_widgetGetData{{charStatsWidget}}};
+
+    #LOCAL {data[coords]} {
+        {x} {$GMCP[room][info][coord][x]}
+        {y} {$GMCP[room][info][coord][y]}
+    };
+
+    _widgetUpdateData {charStatsWidget} {$data};
+}
+
+#NOP Draw the widget.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#ALIAS {_charStatsWidgetDraw} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #NOP Minimum width to render TNL.;
+    #LOCAL {minWidthTNL} {32};
+
+    #NOP Calculate actual measurements.;
+    #LOCAL {top} {};
+    #MATH {top} {%2 + 1};
+    #LOCAL {left} {};
+    #MATH {left} {%3 + 1};
+    #LOCAL {bottom} {};
+    #MATH {bottom} {%4 - 1};
+    #LOCAL {right} {};
+    #MATH {right} {%5 - 1};
+
+    #LOCAL {width} {};
+    #MATH {width} {$right - $left + 1};
+
+    #DRAW {$BOX_COLOR} {$BOX_STYLE} {BOX} {%2} {%3} {%4} {%5};
+    #SCREEN {CLEAR} {SQUARE} {$top} {$left} {$bottom} {$right};
+
+    #IF {$width < $minWidthTNL} {
+        #NOP Too small to show TNL.;
+        _charStatsWidgetDrawStats {$data} {$top} {$left} {$bottom} {$right} {0};
+    }; #ELSE {
+        _charStatsWidgetDrawStats {$data} {$top} {$left} {$bottom} {$right} {1};
+    };
+};
+
+#NOP Draw the stats.;
+#NOP %1 - Data.;
+#NOP %2 - Top coordinate.;
+#NOP %3 - Left coordinate.;
+#NOP %4 - Bottom coordinate.;
+#NOP %5 - Right coordinate.;
+#NOP %6 - Include TNL.;
+#ALIAS {_charStatsWidgetDrawStats} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+    #LOCAL {width} {};
+    #MATH {width} {%5 - %3 + 1};
+
+    #LOCAL {tnl} {$data[exp][tnl]};
+    #FORMAT {tnl} {%g} {$tnl};
+    #LOCAL {tnlpct} {$data[exp][tnlpct]};
+    #MATH {tnlpct} {100 - $tnlpct};
+    #FORMAT {tnlpct} {%g} {$tnlpct};
+    #LOCAL {x} {$data[coords][x]};
+    #LOCAL {y} {$data[coords][y]};
+
+    #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Level\e[0m $data[exp][level] ($data[exp][totallevel])} {%2} {%3};
+    #IF {%6} {
+        #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Progress\e[0m $tnlpct% ($tnl tnl)} {%2 + 1} {%3};
+    }; #ELSE {
+        #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Progress\e[0m $tnlpct%} {%2 + 1} {%3};
+    };
+    #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Sextant [\e[0m$x, $y${PERSONAL_COLOR}]\e[0m} {%2 + 2} {%3};
+};
+
+
+_widgetCreate {charStatsWidget} {_charStatsWidgetDraw} {22} {3};
+
+_pluginCreatePanel {charStats} {charStats} {Room name, terrain info, compass rose}
+_panelCreate {charStats} {WIDGET} {charStatsWidget};
+
+#CLASS {charStatsWidget} {CLOSE};
