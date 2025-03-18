@@ -95,7 +95,7 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_charStatsWidgetUpdateCoor
 
     #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Level\e[0m $data[exp][level] ($data[exp][totallevel])} {%2} {%3};
     #IF {%6} {
-        #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Progress\e[0m $tnlpct% ($tnl tnl)} {%2 + 1} {%3};
+        #LINE IGNORE #SHOWME {${PERSONAL_COLOR}TNL\e[0m $tnl} {%2 + 1} {%3};
     }; #ELSE {
         #LINE IGNORE #SHOWME {${PERSONAL_COLOR}Progress\e[0m $tnlpct%} {%2 + 1} {%3};
     };
