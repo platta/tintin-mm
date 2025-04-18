@@ -1,0 +1,473 @@
+#CLASS {eventTriggers} {OPEN};
+
+#NOP Variable to indicate if we are currently reading affects.;
+#VARIABLE {EVENT_TRIGGERS_READING_AFFECTS} {0};
+
+#NOP Variable to hold captured affects.;
+#VARIABLE {EVENT_TRIGGERS_CAPTURED_AFFECTS} {};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Status effects.;
+#NOP --------------------------------------------------------------------------;
+
+#VARIABLE {MM_AFFECTS} {};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Cold-Blooded.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[COLD-BLOODED]} {
+    {name} {Cold-Blooded}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {/}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Bless.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[BLESS]} {
+    {name} {Bless}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+
+#ACTION {^You no longer feel blessed by the Powers.$} {
+    _eventFire {MM AFFECT} {Bless} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Blindness.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[BLINDNESS]} {
+    {name} {Blindness}
+    {tags} {
+        {DEBUFFS} {}
+    }
+    {nature} {-}
+};
+
+#ACTION {%!{^(?:You have been blinded!|A brilliant flare of white light erupts in front of your eyes!|(.+)(?:- |\.\.\.)you can't see a thing!|You stagger suddenly, struck blind by (.+)'s mind control\.)$}} {
+    _eventFire {MM AFFECT} {Blindness} {SELF} {ON} {%0};
+};
+
+#ACTION {%!{^(?:Light suddenly penetrates the haze clouding your vision, and you can see again|Your vision returns)!$}} {
+    _eventFire {MM AFFECT} {Blindness} {SELF} {OFF} {%0};
+};
+
+#ACTION {^%1 totters suddenly.$} {
+    _eventFire {MM EVENT} {%1 resisted blindness} {{RESIST} {}} {%1} {-} {%0};
+};
+
+#ACTION {%!{^(?:A brilliant flare of white light erupts in front of|(?:A dense black|Black) smoke(?: rises from nowhere and)? swirls (?:in front of|about)) (.+)(?:'s eyes, but .+ shuts them just in time|, but nothing else seems to happen)\.$}} {
+    _eventFire {MM EVENT} {%1 resisted blindness} {{RESIST} {}} {%1} {-} {%0};
+};
+
+#ACTION {%!{^(.+) (?:appears to be blinded\.|is blinded by the smoke!|has been blinded!|staggers suddenly(?:.+) by (?:.+) mind control\.)$}} {
+    _eventFire {MM AFFECT} {Blindness} {%1} {ON} {%0};
+};
+
+#ACTION {%!{^(?:A brilliant flare of white light erupts in front of|(?:A dense black|Black) smoke(?: rises from nowhere and)? swirls in front of|a cloud of dust into) (.+)(?:'s eyes\.|'s eyes!|, obscuring .+ vision\.)$}} {
+    _eventFire {MM AFFECT} {Blindness} {%1} {ON} {%0};
+};
+
+#ACTION {%!{^(.+)(?: suddenly looks more confident as the haze clouding .+ vision is lifted| is no longer blinded|'s eyebrows go crazy as .+ sight returns|rubs the smoke from .+ eyes, regaining the ability to see)\.$}} {
+    _eventFire {MM AFFECT} {Blindness} {%1} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Enhanced Strength.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[ENHANCED STRENGTH]} {
+    {name} {Enhanced Strength}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+
+#ACTION {^Your muscles surge with increased strength.$} {
+    _eventFire {MM AFFECT} {Enhanced Strength} {SELF} {ON} {%0};
+};
+
+#ACTION {^Your super strength has worn off.$} {
+    _eventFire {MM AFFECT} {Enhanced Strength} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Force Field.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[FORCE FIELD]} {
+    {name} {Force Field}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {++}
+};
+
+#ACTION {^You hear a high-pitched shriek as the air around you becomes more dense.$} {
+    _eventFire {MM AFFECT} {Force Field} {SELF} {ON} {%0};
+};
+
+#ACTION {^The air particles around you return to normal density.$} {
+    _eventFire {MM AFFECT} {Force Field} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Fireshield.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[FIRESHIELD]} {
+    {name} {Fireshield}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {++}
+};
+
+#ACTION {^Flames explode around your body, yet you feel no heat or pain.$} {
+    _eventFire {MM AFFECT} {Fireshield} {SELF} {ON} {%0};
+};
+
+#ACTION {^Your fireshield sputters and goes out.$} {
+    _eventFire {MM AFFECT} {Fireshield} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Elemental Shield.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[ELEMENTAL SHIELD]} {
+    {name} {Elemental Shield}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {++}
+};
+
+#ACTION {^There is a faint electrical discharge as your form is surrounded by bands of multicolored light.$} {
+    _eventFire {MM AFFECT} {Elemental Shield} {SELF} {ON} {%0};
+};
+
+#ACTION {^The rainbow aura surrounding you flickers and vanishes.$} {
+    _eventFire {MM AFFECT} {Elemental Shield} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Pass Door.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[PASS DOOR]} {
+    {name} {Pass Door}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Pass Door.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[PENSE]} {
+    {name} {Pense}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+
+Apparently there's no OFF message for this...;
+#ACTION {^You feel a prickling on the back of your neck as your senses are heightened.$} {;
+    _eventFire {MM AFFECT} {Pense} {SELF} {ON} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Physical Reinforcement.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[PHYSICAL REINFORCEMENT]} {
+    {name} {Physical Reinforcement}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+
+#ACTION {^Your body starts to twitch violently as you are filled with tremendous energy.$} {
+    _eventFire {MM AFFECT} {Physical Reinforcement} {SELF} {ON} {%0};
+};
+
+#ACTION {^Your grossly enlarged muscles and fluid-filled joints slowly return to normal.$} {
+    _eventFire {MM AFFECT} {Physical Reinforcement} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Pentacle.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[PENTACLE]} {
+    {name} {Pentacle}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {++}
+}
+
+#ACTION {^A pentacle of reddish light shines briefly upon your chest before fading.$} {
+    _eventFire {MM AFFECT} {Pentacle} {SELF} {ON} {%0};
+};
+
+#ACTION {^You feel the protection of the pentacle subsiding.$} {
+    _eventFire {MM AFFECT} {Pentacle} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Poison.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[POISON]} {
+    {name} {Poison}
+    {tags} {
+        {DEBUFFS} {}
+    }
+    {nature} {--}
+};
+
+#ACTION {%!{^(?:You choke and gag\.|You feel lethargic as an alien substance courses through your veins\.\.\.|You have been poisoned\!|You suddenly feel very ill\.|You cough and choke from the toxic gasses wafting through the air\.|You feel poison coursing through your veins\.)$}} {
+    _eventFire {MM AFFECT} {Poison} {SELF} {ON} {%0};
+};
+
+#ACTION {%!{^(?:The poison burning throughout your body seems to dissipate|You feel relieved as the poison is burned from your body|You peel some bark off a tree and use it to purge the poison from you|Your stomach has stopped churning)\.$}} {
+    _eventFire {MM AFFECT} {Poison} {SELF} {OFF} {%0};
+};
+
+#NOP Poison resisted;
+#NOP ^A noxious cloud of green gas swirls from (.+) fingertips to (?P<who>.+) for a moment\\, but nothing else seems to happen\\.$;
+
+#NOP Other poisoned by other;
+#NOP ^A noxious cloud of green gas pours from (.+) fingertips\\, swirling about (?P<who>.+)\\.$;
+
+#NOP Other poisoned;
+#NOP ^(?P<who>(@!char_name)) (looks very ill|appears to be poisoned|coughs and chokes from the toxic gasses wafting through the air)\\.$;
+
+#NOP Other poison off.;
+#NOP ^(?P<who>(@!char_name)) (appears to look much better|looks relieved as the poison is burned from (.+) body)\\.$;
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Scaled.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[SCALED]} {
+    {name} {Scaled}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {/}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Sense Life.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[SENSE LIFE]} {
+    {name} {Sense Life}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Silence.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[SILENCE]} {
+    {name} {Silence}
+    {tags} {
+        {DEBUFFS} {}
+    }
+    {nature} {-}
+};
+
+#ACTION {^You suddenly feel as if your mouth has been stuffed with cotton!$} {
+    _eventFire {MM AFFECT} {Silence} {SELF} {ON} {%0};
+};
+
+#ACTION {^The feeling of cotton stuffing your mouth finally leaves you.$} {
+    _eventFire {MM AFFECT} {Silence} {SELF} {OFF} {%0};
+};
+
+#ACTION {%!{(.*) (?:is now|has been) silenced\!$}} {
+    _eventFire {MM AFFECT} {Silence} {%1} {ON} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Stolid.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[STOLID]} {
+    {name} {Stolid}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {/}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Shadow Armor.;
+#VARIABLE {MM_AFFECTS[SHADOW ARMOR]} {
+    {name} {Shadow Armor}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {++}
+};
+
+#ACTION {^A dark, shadowy mist gathers itself around your form.$} {
+    _eventFire {MM AFFECT} {Shadow Armor} {SELF} {ON} {%0};
+};
+
+#ACTION {^The shadows protecting you seem to subside.$} {
+    _eventFire {MM AFFECT} {Shadow Armor} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Telekinetic Shield.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[TELEKINETIC SHIELD]} {
+    {name} {Telekinetic Shield}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {++}
+};
+
+#ACTION {^You hear a high-pitched shriek as a circular patch of air hardens in front of you.$} {
+    _eventFire {MM AFFECT} {Telekinetic Shield} {SELF} {ON} {%0};
+};
+
+#ACTION {^The hardened shield of air dissipates.$} {
+    _eventFire {MM AFFECT} {Telekinetic Shield} {SELF} {OFF} {%0};
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Tough Hide.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[TOUGH HIDE]} {
+    {name} {Tough Hide}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {/}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Underwater Breathing.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[UNDERWATER BREATHING]} {
+    {name} {Underwater Breathing}
+    {tags} {
+        {BUFFS} {}
+    }
+    {nature} {+}
+};
+#NOP --------------------------------------------------------------------------;
+
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Combat events.;
+#NOP --------------------------------------------------------------------------;
+
+#ACTION {^You can't do that while casting a spell!$} {
+    _eventFire {MM EVENT} {Spell/ability blocked} {{CASTING} {}} {SELF} {--} {%0};
+};
+
+#ACTION {^You lose your concentration.$} {
+    _eventFire {MM EVENT} {Spell/ability failed} {{CASTING} {}} {SELF} {--} {%0};
+};
+
+#ACTION {^A warm, blue aura surrounds you for a moment, then softly fades.$} {
+    _eventFire {MM EVENT} {Received healing} {{HEALING} {}} {SELF} {++} {%0};
+}
+
+#ACTION {^%1 begins casting a spell...$} {
+    _eventFire {MM EVENT} {%1 began casting} {{CASTING} {}} {%1} {/} {%0};
+};
+
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Read the output of the `affects` command.
+#NOP --------------------------------------------------------------------------;
+
+#ACTION {^You are affected by the following:$} {
+    #VARIABLE {EVENT_TRIGGERS_READING_AFFECTS} {1};
+    #VARIABLE {EVENT_TRIGGERS_CAPTURED_AFFECTS} {};
+};
+
+#ACTION {%!{^(\w+):\s+(.+\S)\s+- Level\s+(\d+), (\w+)\s+(.*\S)\s+by\s+(-?\d+%?)(?:\s+for\s+(\d+) minute(?:s)?\s*)?\.(?:\[\s*(-?\d+%?)\s+(\w+)\s*\])?}} {
+    #IF {$EVENT_TRIGGERS_READING_AFFECTS} {
+        #IF {&EVENT_TRIGGERS_CAPTURED_AFFECTS[%2] == 0} {
+            #VARIABLE {EVENT_TRIGGERS_CAPTURED_AFFECTS[%2]} {
+                {type} {%1}
+                {name} {%2}
+                {level} {%3}
+                {remainingTime} {%7}
+                {upkeepStat} {%8}
+                {upkeepAmount} {%9}
+                {actions} {}
+            };
+        };
+        #VARIABLE {EVENT_TRIGGERS_CAPTURED_AFFECTS[%2][actions][%5]} {
+            {actionType} {%4}
+            {actionTarget} {%5}
+            {actionAmount} {%6}
+        };
+    };
+};
+
+_eventHandlerRegister {PROMPT} {_eventTriggersPromptHandler};
+#ALIAS {_eventTriggersPromptHandler} {
+    #NOP %0;
+    #IF {$EVENT_TRIGGERS_READING_AFFECTS} {
+        #VARIABLE {EVENT_TRIGGERS_READING_AFFECTS} {0};
+        _mmEventsClearAffects;
+        #LOCAL {item} {};
+        #FOREACH {$EVENT_TRIGGERS_CAPTURED_AFFECTS[%*]} {item} {
+            _eventFire {MM AFFECT} {$item[name]} {SELF} {ON} {};
+        };
+    };
+};
+
+#CLASS {eventTriggers} {CLOSE};

@@ -105,7 +105,7 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_charStatsWidgetUpdateCoor
 
 _widgetCreate {charStatsWidget} {_charStatsWidgetDraw} {22} {3};
 
-_pluginCreatePanel {charStats} {charStats} {Room name, terrain info, compass rose}
+_pluginCreatePanel {charStats} {charStats} {Room name, terrain info, compass rose};
 _panelCreate {charStats} {WIDGET} {charStatsWidget};
 
 #CLASS {charStatsWidget} {CLOSE};

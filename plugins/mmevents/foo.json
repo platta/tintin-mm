@@ -1,0 +1,1050 @@
+[
+    {
+        "match": "^(@!char_name)( has siphoned the spell effect of|(|\\'s) (the legendary timepiece \\'(.+)\\'|Redemption from the Darkness) glows brightly as it strips) \\'(?P<spell>.+)\\' (from|off of) (?P<who>.+)\\.$",
+        "send": "show_siphon_or_tpdispel(\"%<who>\", \"%<spell>\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)\\, the Archon Hunter) focuses\\, purging \\'(?P<spell>.+)\\' from (her|him)self with a roar\\!$",
+        "send": "show_siphon_or_tpdispel(\"%<who>\", \"%<spell>\", \"%0\")\n"
+    },
+    {
+        "match": "^(@!char_name)\\, the Archon Hunter\\'s magic goes haywire\\, tearing \\'(?P<spell>.+)\\' from you\\!$",
+        "send": "show_siphon_or_tpdispel(\"you\", \"%<spell>\", \"%0\")\n"
+    },
+    {
+        "match": "^The aegis protecting (?P<who>.+) from harm crumbles\\.$",
+        "send": "if (\"%<who>\" ~= \"you\") then\n  show_other_stuff(\"%<who>\", \"AEGIS off\", \"%0\")\nelse\n  show_important_stuff(\"you\", \"AEGIS off\", \"%0\")\nend\n"
+    },
+    {
+        "match": "You gently settle back onto the ground.",
+        "send": "show_important_stuff(\"you\", \"AIR INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) gently settles back onto the ground\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"AIR INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(The hardened air around you dissipates|The magical armor revolving around you dissipates\\, replaced by hardy tree bark)\\.$",
+        "send": "show_important_stuff(\"you\", \"ARMOR off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a slight shock as the element of ash ceases to flow through you.",
+        "send": "show_important_stuff(\"you\", \"ASH INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "A sparkling wave of amber flits past the corner of your vision, then is gone.",
+        "send": "show_other_stuff(\"you\", \"AUGMENT AURA off\", \"%0\")\n"
+    },
+    {
+        "match": "The rush of adrenaline sustaining you tapers off. You feel a brief moment of exhaustion.",
+        "send": "show_other_stuff(\"you\", \"AWAKEN off\", \"%0\")\n"
+    },
+    {
+        "match": "Your coat of blood starts to coagulate.",
+        "send": "show_other_stuff(\"you\", \"BLOOD DANCE off\", \"%0\")\n"
+    },
+    {
+        "match": "Anyone who might be paying attention would surely notice as your camouflage wears off.",
+        "send": "show_other_stuff(\"you\", \"CAMOUFLAGE off\", \"%0\")\n"
+    },
+    {
+        "match": "^You notice (?P<who>.+) emerge from your peripheral vision\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CAMOUFLAGE off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel different.",
+        "send": "show_other_stuff(\"you\", \"CHANGE SEX\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) doesn\\'t look like (him|her|it)self anymore\\.\\.\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CHANGE SEX\", \"%0\")\n"
+    },
+    {
+        "match": "Your body returns to its natural form.",
+        "send": "show_other_stuff(\"you\", \"CHANGE SEX off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s body suddenly changes shape\\, and an eldritch glimmer drifts off into the atmosphere\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CHANGE SEX off\", \"%0\")\n"
+    },
+    {
+        "match": "The bluish field at the edge of your vision dissipates.",
+        "send": "show_important_stuff(\"you\", \"COMBAT BLINK off\", \"%0\")\n"
+    },
+    {
+        "match": "The strange mist obscuring your belongings fades and vanishes.",
+        "send": "show_other_stuff(\"you\", \"CONCEALMENT off\", \"%0\")\n"
+    },
+    {
+        "match": "^(@!char_name) condemns you and your armor\\, casting you out\\.$",
+        "send": "show_other_stuff(\"you\", \"CONDEMN armor\", \"%0\")\n"
+    },
+    {
+        "match": "^(@!char_name) condemns you and your magic\\, casting you out\\.$",
+        "send": "show_other_stuff(\"you\", \"CONDEMN magic\", \"%0\")\n"
+    },
+    {
+        "match": "^(You|(@!char_name)) condemn(|s) (?P<who>.+) and (his|her|its) armor\\, casting (him|her|it) out\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CONDEMN armor\", \"%0\")\n"
+    },
+    {
+        "match": "^(You|(@!char_name)) condemn(|s) (?P<who>.+) and (his|her|its) magic\\, casting (him|her|it) out\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CONDEMN magic\", \"%0\")\n"
+    },
+    {
+        "match": "The condemnation wracking your conscience fades.",
+        "send": "show_other_stuff(\"you\", \"CONDEMN off\", \"%0\")\n"
+    },
+    {
+        "match": "^The condemnation wracking (?P<who>.+)\\'s conscience fades\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CONDEMN off\", \"%0\")\n"
+    },
+    {
+        "match": "Your head feels numb as the world around you seems to warp and distort.",
+        "send": "show_handicap_stuff(\"you\", \"CONFUSION\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) staggers and steps backwards\\, shaking (his|her|its) head in confusion\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CONFUSION\", \"%0\")\n"
+    },
+    {
+        "match": "^There is a low rumble of thunder as the space surrounding (?P<who>.+) warps and distorts\\, as if in pain(.*?)$",
+        "send": "show_other_stuff(\"%<who>\", \"CONFUSION\", \"%0\")\n"
+    },
+    {
+        "match": "The warping and twisting of your vision slowly decreases, then stops.",
+        "send": "show_other_stuff(\"you\", \"CONFUSION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) no longer seems bewildered by (his|her|its) surroundings\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CONFUSION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows with a dark crimson aura that swiftly vanishes\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CURSE resisted\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a crushing weight throughout your entire being, and stagger slightly.",
+        "send": "show_other_stuff(\"you\", \"CURSE or MALEDICTION\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows briefly with a dark crimson aura\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CURSE\", \"%0\")\n"
+    },
+    {
+        "match": "^(The curse afflicting you dissipates|You feel a great weight lifted from your shoulders)\\.$",
+        "send": "show_other_stuff(\"you\", \"CURSE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) looks less afflicted\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"CURSE off\", \"%0\")\n"
+    },
+    {
+        "match": "^((.+?)you are deafened\\!|There is a low rumble of thunder as a tightly\\-contained and directed energy shockwave blasts through the area\\.)$",
+        "send": "show_other_stuff(\"you\", \"DEAFEN\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) stumbles and shakes (.+) head\\, as if in pain\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"DEAFEN\", \"%0\")\n"
+    },
+    {
+        "match": "You slowly realize that you are hearing sounds again.",
+        "send": "show_other_stuff(\"you\", \"DEAFEN off\", \"%0\")\n"
+    },
+    {
+        "match": "Your grip on your weapon loosens.",
+        "send": "show_other_stuff(\"you\", \"DEATH GRIP off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s grip on (his|her|its) weapon loosens\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"DEATH GRIP off\", \"%0\")\n"
+    },
+    {
+        "match": "The world turns blue as you are temporarily shrouded by a strange nimbus of energy.",
+        "send": "show_other_stuff(\"you\", \"DELAY REINCARNATION\", \"%0\")\n"
+    },
+    {
+        "match": "You feel as if a great weight has been lifted from your soul.",
+        "send": "show_other_stuff(\"you\", \"DELAY REINCARNATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(@!char_name) performs an unsightly ritual in front of you\\.$",
+        "send": "show_other_stuff(\"you\", \"DESECRATE ARMOR\", \"%0\")\n"
+    },
+    {
+        "match": "^You perform an unsightly ritual in front of (?P<who>.+)\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"DESECRATE ARMOR\", \"%0\")\n"
+    },
+    {
+        "match": "You can no longer detect auras.",
+        "send": "show_other_stuff(\"you\", \"DETECT ALIGNMENT off\", \"%0\")\n"
+    },
+    {
+        "match": "You have lost your ability to detect illusions.",
+        "send": "show_important_stuff(\"you\", \"DETECT ILLUSION off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel different as your senses become less heightened.",
+        "send": "show_important_stuff(\"you\", \"DETECT INVISIBILITY off\", \"%0\")\n"
+    },
+    {
+        "match": "You can no longer detect magical auras.",
+        "send": "show_other_stuff(\"you\", \"DETECT MAGIC off\", \"%0\")\n"
+    },
+    {
+        "match": "The room starts to spin as vertigo sets in, and the only constant in view is *'s face.",
+        "send": "show_other_stuff(\"you\", \"DISEQUILIBRIATE\", \"%0\")\n"
+    },
+    {
+        "match": "The room stops spinning about you.",
+        "send": "show_other_stuff(\"you\", \"DISEQUILIBRIATE off\", \"%0\")\n"
+    },
+    {
+        "match": "You stagger suddenly, and your vision turns amber for a moment.",
+        "send": "show_other_stuff(\"you\", \"DISJUNCTION\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) staggers suddenly\\, and is outlined by a faint amber glow\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"DISJUNCTION\", \"%0\")\n"
+    },
+    {
+        "match": "The amber tint afflicting your vision clears.",
+        "send": "show_other_stuff(\"you\", \"DISJUNCTION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) shakes (his|her|its) head as the disjunction affecting (him|her|it) fades away\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"DISJUNCTION off\", \"%0\")\n"
+    },
+    {
+        "match": "The dust cloud whirling about you thins and dissipates.",
+        "send": "show_important_stuff(\"you\", \"DUST INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(@!char_name) coats you with a glob of mucus\\, leaving you conductive but unharmed\\.$",
+        "send": "show_other_stuff(\"you\", \"ELECTROGENIC GROWTH\", \"%0\")\n"
+    },
+    {
+        "match": "^(@!char_name) coats (?P<who>.+) with a glob of mucus\\, leaving (him|her|it) conductive but unharmed\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"ELECTROGENIC GROWTH\", \"%0\")\n"
+    },
+    {
+        "match": "^The rainbow aura surrounding (?P<who>.+) flickers and vanishes\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"ELEMENTAL SHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "The electrical energy pulses and arcs throughout your body!",
+        "send": "show_critical_stuff(\"you\", \"ENERGY ORB\", \"%0\")\n"
+    },
+    {
+        "match": "^The electrical energy pulses and arcs throughout (?P<who>.+)\\'s body\\!$",
+        "send": "show_critical_stuff(\"%<who>\", \"ENERGY ORB\", \"%0\")\n"
+    },
+    {
+        "match": "^Electrical energy pulses(| and arcs) through(|out) your body\\!$",
+        "send": "show_critical_stuff(\"you\", \"ENERGY ORB tick\", \"%0\")\n"
+    },
+    {
+        "match": "^Electrical energy pulses(| and arcs) through(|out) (?P<who>.+)\\'s body\\!$",
+        "send": "show_critical_stuff(\"%<who>\", \"ENERGY ORB tick\", \"%0\")\n"
+    },
+    {
+        "match": "The electrical energy cracking through your body is grounded.",
+        "send": "show_other_stuff(\"you\", \"ENERGY ORB off\", \"%0\")\n"
+    },
+    {
+        "match": "^The electrical energy cracking through (?P<who>.+)\\'s body is grounded\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"ENERGY ORB off\", \"%0\")\n"
+    },
+    {
+        "match": "Your super strength has worn off.",
+        "send": "show_other_stuff(\"you\", \"ENHANCED STRENGTH off\", \"%0\")\n"
+    },
+    {
+        "match": "Your eyes burn with an inner fire as the knowledge of the ages floods into your mind.",
+        "send": "show_other_stuff(\"you\", \"EPIPHANY\", \"%0\")\n"
+    },
+    {
+        "match": "Your series of epiphanic revelations come to an end.",
+        "send": "show_other_stuff(\"you\", \"EPIPHANY off\", \"%0\")\n"
+    },
+    {
+        "match": "Your connection to the twin moons' etheric energy has been disrupted!",
+        "send": "show_handicap_stuff(\"you\", \"ETHERIC POLLUTION\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s connection to the twin moons\\' etheric energy has been disrupted\\!$",
+        "send": "show_handicap_stuff(\"%<who>\", \"ETHERIC POLLUTION\", \"%0\")\n"
+    },
+    {
+        "match": "You feel your connection to the twin moons return.",
+        "send": "show_other_stuff(\"you\", \"ETHERIC POLLUTION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) shines with the sudden return of energy from the twin moons\\.$",
+        "send": "show_handicap_stuff(\"%<who>\", \"ETHERIC POLLUTION off\", \"%0\")\n"
+    },
+    {
+        "match": "You stumble and almost fall, as you feel the evil power of *'s gaze affecting you.",
+        "send": "show_other_stuff(\"you\", \"EVIL EYE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) stumbles and almost falls\\, and a low gasp escapes from (.+)\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"EVIL EYE\", \"%0\")\n"
+    },
+    {
+        "match": "You feel better as the pervading feeling of doom leaves you.",
+        "send": "show_other_stuff(\"you\", \"EVIL EYE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(You|(@!char_name)) grab(|s) ahold of (?P<who>.+) and cast(|s) (him|her|it) out\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"EXCOMMUNICATE\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a horrific, crushing weight press throughout your entire being.",
+        "send": "show_critical_stuff(\"you\", \"EXTINCTION\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows briefly with a maleficent citrine aura\\.$",
+        "send": "show_critical_stuff(\"%<who>\", \"EXTINCTION\", \"%0\")\n"
+    },
+    {
+        "match": "^You turn pale(| and shudder) as dark magic burns away some of your life force\\.$",
+        "send": "show_critical_stuff(\"you\", \"EXTINCTION tick\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) turns pale and shudders\\.$",
+        "send": "show_critical_stuff(\"%<who>\", \"EXTINCTION tick\", \"%0\")\n"
+    },
+    {
+        "match": "You feel better as the lethal necromantic energy finally leaves your body.",
+        "send": "show_other_stuff(\"you\", \"EXTINCTION off\", \"%0\")\n"
+    },
+    {
+        "match": "^You are (outlined by a faint pink glow|surrounded by a pink outline)\\.$",
+        "send": "show_other_stuff(\"you\", \"FAERIE FIRE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) is (outlined by a faint pink glow|surrounded by a pink outline)\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FAERIE FIRE\", \"%0\")\n"
+    },
+    {
+        "match": "The pink glow surrounding you fades away.",
+        "send": "show_other_stuff(\"you\", \"FAERIE FIRE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The pink glow surrounding (?P<who>.+) slowly fades away\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FAERIE FIRE off\", \"%0\")\n"
+    },
+    {
+        "match": "*'s fingertips brush you, causing you to feel a sudden, strong pang of hunger.",
+        "send": "show_important_stuff(\"you\", \"FAMINE\", \"%0\")\n"
+    },
+    {
+        "match": "^Your fingertips brush (?P<who>.+), causing (.+) to gasp in shock\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FAMINE\", \"%0\")\n"
+    },
+    {
+        "match": "You feel lethargic, as if you need more sleep.",
+        "send": "show_other_stuff(\"you\", \"FATIGUE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) is moving more lethargically\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FATIGUE\", \"%0\")\n"
+    },
+    {
+        "match": "You feel the unusual lethargy leaving your muscles.",
+        "send": "show_other_stuff(\"you\", \"FATIGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) seems refreshed as (his|her|its) focus returns\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FATIGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The elemental flames surrounding your body wisp into the ether\\.$",
+        "send": "show_lethal_stuff(\"you\", \"FIRE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^The elemental flames surrounding (?P<who>.+)\\'s body wisp into the ether\\.$",
+        "send": "show_lethal_stuff(\"%<who>\", \"FIRE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "Your fireshield sputters and goes out.",
+        "send": "show_other_stuff(\"you\", \"FIRESHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "^The shield of flames surrounding (?P<who>.+) sputters and goes out\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FIRESHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "You are covered with tinder.",
+        "send": "show_other_stuff(\"you\", \"FLINTSTRIKE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) is coated with tinder\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FLINTSTRIKE\", \"%0\")\n"
+    },
+    {
+        "match": "The air particles around you return to normal density.",
+        "send": "show_other_stuff(\"you\", \"FORCE FIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "^The air around (?P<who>.+) becomes less dense\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FORCE FIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "A chill sinks deep into your bones.",
+        "send": "show_other_stuff(\"you\", \"FROST\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) turns blue and shivers\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FROST\", \"%0\")\n"
+    },
+    {
+        "match": "The frost covering you melts and you feel much warmer.",
+        "send": "show_other_stuff(\"you\", \"FROST off\", \"%0\")\n"
+    },
+    {
+        "match": "^The frost covering (?P<who>.+) thaws\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FROST off\", \"%0\")\n"
+    },
+    {
+        "match": "The fungus leeches into your skin.",
+        "send": "show_other_stuff(\"you\", \"FUNGAL GROWTH\", \"%0\")\n"
+    },
+    {
+        "match": "^The fungus leeches into (?P<who>.+)\\'s skin\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"FUNGAL GROWTH\", \"%0\")\n"
+    },
+    {
+        "match": "^Your body finally eradicates the infectious organisms coursing through it\\.$",
+        "send": "show_other_stuff(\"you\", \"FUNGAL GROWTH off\", \"%0\")\n"
+    },
+    {
+        "match": "The glamour wears off and your appearance reverts to normal.",
+        "send": "show_other_stuff(\"you\", \"GLAMOUR off\", \"%0\")\n"
+    },
+    {
+        "match": "You slink into a lower profile, anxious beneath *'s cruel eye.",
+        "send": "show_other_stuff(\"you\", \"GLARE OF THE CROCODILE\", \"%0\")\n"
+    },
+    {
+        "match": "The unnerving feeling of someone watching you disappears.",
+        "send": "show_other_stuff(\"you\", \"GLARE OF THE CROCODILE off\", \"%0\")\n"
+    },
+    {
+        "match": "Your body slumps into its natural form as your woodform reverts to flesh.",
+        "send": "show_important_stuff(\"you\", \"GUISE OF NATURE off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel your movements slow to normal.",
+        "send": "show_important_stuff(\"you\", \"HASTE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) is no longer moving quickly\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"HASTE off\", \"%0\")\n"
+    },
+    {
+        "match": "^Shrieking mightily\\, (?P<who>.+) heralds (his|her|its) own bloodthirstiness\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"HERALD BLOODTHIRST\", \"%0\")\n"
+    },
+    {
+        "match": "^You feel less bloodthirsty\\.$",
+        "send": "show_other_stuff(\"you\", \"HERALD BLOODTHIRST off\", \"%0\")\n"
+    },
+    {
+        "match": "^The crazed look in (?P<who>.+)\\'s bloodshot eyes fades away\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"HERALD BLOODTHIRST off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows with an ominous crimson aura\\, but it fades too quickly\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"HEX resisted\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a stifling, powerful shock throughout your entire being, and stagger slightly.",
+        "send": "show_other_stuff(\"you\", \"HEX or BINDING CURSE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows briefly with an ominous crimson aura\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"HEX\", \"%0\")\n"
+    },
+    {
+        "match": "^(The stifling feeling of oppression leaves your being|The oppression hex stifling you finally dissipates)\\.$",
+        "send": "show_other_stuff(\"you\", \"HEX off\", \"%0\")\n"
+    },
+    {
+        "match": "^The hex placed upon (?P<who>.+) finally loses its hold\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"HEX off\", \"%0\")\n"
+    },
+    {
+        "match": "You jiggle and move about, alerting anyone watching to your presence.",
+        "send": "show_other_stuff(\"you\", \"HIDE off\", \"%0\")\n"
+    },
+    {
+        "match": "The ice covering your body finally cracks and melts.",
+        "send": "show_important_stuff(\"you\", \"ICE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^The air around (?P<who>.+)'s seems clearer\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"ICE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel as if your feet have grown roots, and can only move with great difficulty!",
+        "send": "show_other_stuff(\"you\", \"IMMOBILIZE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) gasps as the power of your gaze affects (.+)\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"IMMOBILIZE\", \"%0\")\n"
+    },
+    {
+        "match": "The weighted feeling in your feet greatly lessens.",
+        "send": "show_other_stuff(\"you\", \"IMMOBILIZE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s knees nearly buckle as (he|she|it) regains (his|her|its) balance\\, no long immobilized\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"IMMOBILIZE off\", \"%0\")\n"
+    },
+    {
+        "match": "The strange nimbus surrounding you seems to dissipate.",
+        "send": "show_other_stuff(\"you\", \"IMMUTABLE NIMBUS off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a sudden weight crushing down upon your every movement, making it more difficult to walk.",
+        "send": "show_other_stuff(\"you\", \"IMPEDE MOVEMENT\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) stumbles and staggers under the additional weight (.+) bestowed upon (.+)\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"IMPEDE MOVEMENT\", \"%0\")\n"
+    },
+    {
+        "match": "You no longer feel the crushing weight pressing down upon your every movement.",
+        "send": "show_other_stuff(\"you\", \"IMPEDE MOVEMENT off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) staggers as (.+) legs start to function properly again\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"IMPEDE MOVEMENT off\", \"%0\")\n"
+    },
+    {
+        "match": "Your field of vision changes slightly; it's as if you are seeing everything through a red-tinted haze.",
+        "send": "show_other_stuff(\"you\", \"INDUCE AGGRESSION\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) changes (his|her|its) stance and suddenly seems quite a bit more aggressive\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"INDUCE AGGRESSION\", \"%0\")\n"
+    },
+    {
+        "match": "The reddish tint affecting your vision seems to fade.",
+        "send": "show_other_stuff(\"you\", \"INDUCE AGGRESSION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) seems to have adopted a less aggressive stance\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"INDUCE AGGRESSION off\", \"%0\")\n"
+    },
+    {
+        "match": "You can no longer detect the body heat of life forms in the dark.",
+        "send": "show_other_stuff(\"you\", \"INFRAVISION off\", \"%0\")\n"
+    },
+    {
+        "match": "The voices in your head begin to taunt you wildly as your sanity slips away from you!",
+        "send": "show_other_stuff(\"you\", \"INSANITY\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) flails (.+) arms about wildly\\, and gibbers\\, shrieking about voices in (.+) head\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"INSANITY\", \"%0\")\n"
+    },
+    {
+        "match": "The voices babbling in your head subside; you regain a sense of your surroundings.",
+        "send": "show_other_stuff(\"you\", \"INSANITY off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s eyes look less vacant as the shrieking voices in (.+) head recede\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"INSANITY off\", \"%0\")\n"
+    },
+    {
+        "match": "You sing the praises of the hymn and feel inspired.",
+        "send": "show_other_stuff(\"you\", \"INSPIRATIONAL HYMN\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s ears perk up as (he|she|it) hears the word of the hymn\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"INSPIRATIONAL HYMN\", \"%0\")\n"
+    },
+    {
+        "match": "The feeling on inspiration leaves you as you stop humming.",
+        "send": "show_other_stuff(\"you\", \"INSPIRATIONAL HYMN off\", \"%0\")\n"
+    },
+    {
+        "match": "^You (fade back into sight|shimmer and reappear|are now visible to the naked eye again|fade into existence)\\.$",
+        "send": "show_other_stuff(\"you\", \"INVISIBILITY off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows with a malevolent mauve aura\\, but it fades too quickly\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"JINX resisted\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a shocking, unexpected weight throughout your entire being, and stagger slightly.",
+        "send": "show_other_stuff(\"you\", \"JINX\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows briefly with a malevolent mauve aura\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"JINX\", \"%0\")\n"
+    },
+    {
+        "match": "You feel as if a great weight has been lifted from your spirit.",
+        "send": "show_other_stuff(\"you\", \"JINX off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) appears less burdened by misfortune\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"JINX off\", \"%0\")\n"
+    },
+    {
+        "match": "As the lava cloak bound to your flesh extinguishes, your skin softens.",
+        "send": "show_other_stuff(\"you\", \"LAVA CLOAK off\", \"%0\")\n"
+    },
+    {
+        "match": "The protective clumps of smoldering lava on your feet solidify and crumble off.",
+        "send": "show_important_stuff(\"you\", \"LAVA WALK off\", \"%0\")\n"
+    },
+    {
+        "match": "^The protective clumps of smoldering lava on (?P<who>.+)\\'s feet solidify and crumble off\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"LAVA WALK off\", \"%0\")\n"
+    },
+    {
+        "match": "^The vampiric conduit wavering from (?P<who>.+)\\'s chest dissipates\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"LEECH CONDUIT off\", \"%0\")\n"
+    },
+    {
+        "match": "You slowly settle back to the ground.",
+        "send": "show_important_stuff(\"you\", \"LEVITATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>.(@!char_name)) slowly settles back to the ground\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"LEVITATION off\", \"%0\")\n"
+    },
+    {
+        "match": "There is a faint blue spark as the electricity speeding you up is discharged.",
+        "send": "show_important_stuff(\"you\", \"LIGHTNING INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^The lightning speeding up (?P<who>.+) discharges to the ground\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"LIGHTNING INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^The prismatic shroud of lightning surrounding (?P<who>.+) surges\\, then discharges harmlessly to the ground\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"LIGHTNING SHROUD off\", \"%0\")\n"
+    },
+    {
+        "match": "^The flames surrounding (?P<who>.+) flicker and vanish\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MAGMA INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows with a malevolent fuchsia aura\\, but it fades quickly\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MALEDICTION resisted\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) glows briefly with a malevolent fuchsia aura\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MALEDICTION\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a great weight lift from your spirit.",
+        "send": "show_other_stuff(\"you\", \"MALEDICTION off\", \"%0\")\n"
+    },
+    {
+        "match": "^Malevolent energy rises from (?P<who>.+) and slowly dissipate(.*?)$",
+        "send": "show_other_stuff(\"%<who>\", \"MALEDICTION off\", \"%0\")\n"
+    },
+    {
+        "match": "^A sickly glow surges around (?P<who>.+) only to fade out of existence just as quick\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MALIGNANCY resisted\", \"%0\")\n"
+    },
+    {
+        "match": "You are outlined with an sickly green glow, briefly.",
+        "send": "show_other_stuff(\"you\", \"MALIGNANCY\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) is outlined with a sickly green glow\\, briefly\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MALIGNANCY\", \"%0\")\n"
+    },
+    {
+        "match": "A sickly green glow flits past the corner of your vision, then fades.",
+        "send": "show_other_stuff(\"you\", \"MALIGNANCY off\", \"%0\")\n"
+    },
+    {
+        "match": "You stagger and step back a foot as you sense a foreign presence attempting to enter your mind.",
+        "send": "show_important_stuff(\"you\", \"MEMORY DRAIN\", \"%0\")\n"
+    },
+    {
+        "match": "^You extend your senses into the astral plane\\, working on (?P<who>.+)\\'s memories\\.\\.\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MEMORY DRAIN\", \"%0\")\n"
+    },
+    {
+        "match": "(?P<who>(@!char_name)) staggers suddenly.",
+        "send": "show_other_stuff(\"%<who>\", \"MENTAL DISRUPTION resisted\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) staggers suddenly as (his|her|its) mind is disrupted by your mental power\\.$",
+        "send": "show_handicap_stuff(\"%<who>\", \"MENTAL DISRUPTION\", \"%0\")\n"
+    },
+    {
+        "match": "The heavy weight pressing down on your mind seems to be suddenly released.",
+        "send": "show_other_stuff(\"you\", \"MENTAL DISRUPTION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(You revert back to your normal form\\.|You struggle to hold your form\\, but you eventually revert to your original shape\\.)$",
+        "send": "show_other_stuff(\"you\", \"MIMIC off\", \"%0\")\n"
+    },
+    {
+        "match": "The image of the brick wall fades from your mind.",
+        "send": "show_important_stuff(\"you\", \"MIND SHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "^A patina of caustic acid washes over (?P<who>.+) before melting away (.+) skin\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MUTILATE\", \"%0\")\n"
+    },
+    {
+        "match": "The hideous scars covering your face spontaneously heal themselves.",
+        "send": "show_other_stuff(\"you\", \"MUTILATE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The hideous scars covering (?P<who>.+)'s face spontaneously heal themselves\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"MUTILATE off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel slightly more sinister.",
+        "send": "show_other_stuff(\"you\", \"NECROMANCERS GUILE\", \"%0\")\n"
+    },
+    {
+        "match": "The peripheral of your vision seems to lighten a bit and you feel less nefarious.",
+        "send": "show_other_stuff(\"you\", \"NECROMANCERS GUILE off\", \"%0\")\n"
+    },
+    {
+        "match": "Your tongue dries out, and you suddenly start to fear the notion of sleep.",
+        "send": "show_other_stuff(\"you\", \"NIGHTMARES\", \"%0\")\n"
+    },
+    {
+        "match": "Your eyelips start to droop and sleep seems rather appealing.",
+        "send": "show_other_stuff(\"you\", \"NIGHTMARES off\", \"%0\")\n"
+    },
+    {
+        "match": "The ooze surrounding your body evaporates.",
+        "send": "show_important_stuff(\"you\", \"OOZE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^The ooze surrounding (?P<who>.+)\\'s form evaporates into the air\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"OOZE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "The curious stone in your ear rattles out and away.",
+        "send": "show_important_stuff(\"you\", \"OTOLITHIC GROWTH off\", \"%0\")\n"
+    },
+    {
+        "match": "^(You feel strangely lethargic as an alien substance courses through your veins\\.\\.\\.|You feel your head pounding as if it would burst\\, and cannot move from your current position\\!)$",
+        "send": "show_handicap_stuff(\"you\", \"PARALYSIS\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) staggers and steps back\\, (clutching (his|her|its) head|seemingly winded)\\.$",
+        "send": "show_critical_stuff(\"%<who>\", \"PARALYSIS\", \"%0\")\n"
+    },
+    {
+        "match": "You can move again.",
+        "send": "show_other_stuff(\"you\", \"PARALYSIS off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) looks less rigid\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"PARALYSIS off\", \"%0\")\n"
+    },
+    {
+        "match": "You are no longer translucent.",
+        "send": "show_other_stuff(\"you\", \"PASS DOOR off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel the protection of the pentacle subsiding.",
+        "send": "show_other_stuff(\"you\", \"PENTACLE off\", \"%0\")\n"
+    },
+    {
+        "match": "The pestilential lesions tormenting you recede with time.",
+        "send": "show_other_stuff(\"you\", \"PESTILENCE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The pestilential lesions covering (?P<who>.+) recede with time\\.$",
+        "send": "show_important_stuff(\"%<who>\", \"PESTILENCE off\", \"%0\")\n"
+    },
+    {
+        "match": "You stand down from your phalanx position.",
+        "send": "show_important_stuff(\"you\", \"PHALANX off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) seems to resist (.+) magical plague\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"PLAGUE resisted\", \"%0\")\n"
+    },
+    {
+        "match": "^(Ghastly looking sores start cropping up on your body (.+)\\!|You cough and choke from the diseased gasses wafting through the air\\.)$",
+        "send": "show_important_stuff(\"you\", \"PLAGUE\", \"%0\")\n"
+    },
+    {
+        "match": "^(Ghastly looking sores|More sores) start cropping up on (?P<who>.+)\\'s body (.+)\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"PLAGUE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) gasps as (.+) inhales some of the disease-ridden vapor\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"PLAGUE\", \"%0\")\n"
+    },
+    {
+        "match": "^(The plague sores tormenting you suddenly vanish|You feel relieved as the (disease|plague) is burned from your body|You feel relieved as your (disease|plague) is cured)\\.$",
+        "send": "show_other_stuff(\"you\", \"PLAGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The sores covering (?P<who>.+) suddenly vanish\\.$",
+        "send": "show_important_stuff(\"%<who>\", \"PLAGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) looks relieved as (.+) (disease|plague) is (cured|burned from (.+) body)\\.$",
+        "send": "show_important_stuff(\"%<who>\", \"PLAGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel exhausted and haggard, all the worse for wear.",
+        "send": "show_other_stuff(\"you\", \"PLODDING FUGUE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) suddenly looks worn out and exhausted\\, as though by a drudging slog\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"PLODDING FUGUE\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a bit more spring in your walk, a bit more pep in your step.",
+        "send": "show_other_stuff(\"you\", \"PLODDING FUGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) seems to perk up a bit\\, dancing a merry little jig\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"PLODDING FUGUE off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel more vulnerable to evil forces.",
+        "send": "show_other_stuff(\"you\", \"PROTECTION FROM EVIL off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel vulnerable to good forces again.",
+        "send": "show_other_stuff(\"you\", \"PROTECTION FROM GOOD off\", \"%0\")\n"
+    },
+    {
+        "match": "The violet light coloring everything fades from your vision.",
+        "send": "show_important_stuff(\"you\", \"RADIANCE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^The white aura surrounding (?P<who>.+) fades away\\.$",
+        "send": "show_lethal_stuff(\"%<who>\", \"SANCTUARY off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel less aware of your surroundings.",
+        "send": "show_important_stuff(\"you\", \"SENSE LIFE off\", \"%0\")\n"
+    },
+    {
+        "match": "You no longer feel a tingling in your pineal gland.",
+        "send": "show_other_stuff(\"you\", \"SENSORY ENHANCEMENT off\", \"%0\")\n"
+    },
+    {
+        "match": "^(You begin to have difficulty retaining your altered shape\\.\\.|Your form reverts to normal)\\.$",
+        "send": "show_important_stuff(\"you\", \"SHAPE SHIFTING off\", \"%0\")\n"
+    },
+    {
+        "match": "Your force shield dissipates.",
+        "send": "show_important_stuff(\"you\", \"SHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s force shield dissipates\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "You suddenly feel as if your mouth has been stuffed with cotton!",
+        "send": "show_handicap_stuff(\"you\", \"SILENCE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) (is now|has been) silenced\\!$",
+        "send": "show_important_stuff(\"%<who>\", \"SILENCE\", \"%0\")\n"
+    },
+    {
+        "match": "The feeling of cotton stuffing your mouth finally leaves you.",
+        "send": "show_other_stuff(\"you\", \"SILENCE off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel very sleepy... Zzzzzz...",
+        "send": "show_handicap_stuff(\"you\", \"SLEEP\", \"%0\")\n"
+    },
+    {
+        "match": "You feel the magical pressure to remain asleep lift.*",
+        "send": "show_other_stuff(\"you\", \"SLEEP off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) seems to resist your enchantment\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"SLOW resisted\", \"%0\")\n"
+    },
+    {
+        "match": "You feel sluggish.",
+        "send": "show_handicap_stuff(\"you\", \"SLOW\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) is moving in slow motion\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SLOW\", \"%0\")\n"
+    },
+    {
+        "match": "(You no longer feel slower than honey pours in the winter|You shrug off your slug(|g)ishness\\, feeling unhindered and renewed)\\.",
+        "send": "show_other_stuff(\"you\", \"SLOW off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) (seems to be moving at a normal pace again|shrugs off (.+) slugishness)\\.$",
+        "send": "show_important_stuff(\"%<who>\", \"SLOW off\", \"%0\")\n"
+    },
+    {
+        "match": "A strange streaking haze overtakes your vision as everything around you appears to be moving slightly slower.",
+        "send": "show_handicap_stuff(\"you\", \"SLOW MAGIC\", \"%0\")\n"
+    },
+    {
+        "match": "^You create a very small temporospatial claudication directly around (?P<who>.+)'s body, and (.+) time field becomes slightly out of sync with everyone else\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SLOW MAGIC\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) appears to be moving much slower\\, creating an odd rippling effect in the air around (.+)\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SLOW MAGIC\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a startling pulling sensation as you are jerked back into normal time.",
+        "send": "show_other_stuff(\"you\", \"SLOW MAGIC off\", \"%0\")\n"
+    },
+    {
+        "match": "^The rippling effect in the space about (?P<who>.+) seems to dissipate\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SLOW MAGIC off\", \"%0\")\n"
+    },
+    {
+        "match": "^You(| slowly) fade back into existence\\.$",
+        "send": "show_other_stuff(\"you\", \"SMOKE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) fades into existence\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SMOKE INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "You no longer feel stealthy.",
+        "send": "show_other_stuff(\"you\", \"SNEAKING off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) falters momentarily\\, as though distracted by the soothing song$",
+        "send": "show_other_stuff(\"%<who>\", \"SOOTHING NOCTURNE resisted\", \"%0\")\n"
+    },
+    {
+        "match": "You feel overwhelmed by the beauty of the nocturne.",
+        "send": "show_other_stuff(\"you\", \"SOOTHING NOCTURNE\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) falters\\, distracted by the beauty of the nocturne\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SOOTHING NOCTURNE\", \"%0\")\n"
+    },
+    {
+        "match": "Shaking the lazy off, you feel energetic and aspirational.",
+        "send": "show_other_stuff(\"you\", \"SOOTHING NOCTURNE off\", \"%0\")\n"
+    },
+    {
+        "match": "^Catching a lucky break\\, (?P<who>.+) trips over a crack and is startled out of the nocturne\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SOOTHING NOCTURNE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The shimmering bands of light surrounding (?P<who>.+) fade and vanish\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"SPELL SHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "You can no longer do anything but think - your body has been turned into stone.",
+        "send": "show_handicap_stuff(\"you\", \"STONE CURSE\", \"%0\")\n"
+    },
+    {
+        "match": "The curse of stone wears off suddenly, and you find you can move again as your body comes back to life.",
+        "send": "show_other_stuff(\"you\", \"STONE CURSE off\", \"%0\")\n"
+    },
+    {
+        "match": "^The curse of stone affecting (?P<who>.+) wears off suddenly\\, and (.+) begins to move again\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"STONE CURSE off\", \"%0\")\n"
+    },
+    {
+        "match": "You become more opaque as your steamy form solidifies.",
+        "send": "show_other_stuff(\"you\", \"STEAM INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) becomes more opaque as (his|her|its) steamy form solidifies\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"STEAM INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "Your skin feels soft and pliable again.",
+        "send": "show_important_stuff(\"you\", \"STONE SKIN off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name))\\'s skin looks normal again\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"STONE SKIN off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel a weight off your mind as it transfer to your shoulders.",
+        "send": "show_other_stuff(\"you\", \"TELEKINESIS off\", \"%0\")\n"
+    },
+    {
+        "match": "The hardened shield of air dissipates.",
+        "send": "show_important_stuff(\"you\", \"TELEKINETIC SHIELD off\", \"%0\")\n"
+    },
+    {
+        "match": "(You feel the magic enabling you to breathe underwater diminish\\.|Anamor Grintooth\\, heir apparent to Darksea seizes upon something magical you cannot quite detect\\, and shreds it with his claws\\.)",
+        "send": "show_important_stuff(\"you\", \"UNDERWATER BREATHING off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel warmer as the element of water ceases to flow through you.",
+        "send": "show_important_stuff(\"you\", \"WATER INVOCATION off\", \"%0\")\n"
+    },
+    {
+        "match": "You feel as though your legs have turned to water! You stagger, barely able to walk.",
+        "send": "show_other_stuff(\"you\", \"WEAKEN\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) shudders\\, staggers\\, and almost falls\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"WEAKEN\", \"%0\")\n"
+    },
+    {
+        "match": "You feel strong again.",
+        "send": "show_other_stuff(\"you\", \"WEAKEN off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) appears to feel stronger\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"WEAKEN off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) (dodges out of the way of your vines|manages to brush the spiders off him just in time)\\!$",
+        "send": "show_other_stuff(\"%<who>\", \"WEB resisted\", \"%0\")\n"
+    },
+    {
+        "match": "^(You are enmeshed in thick webbing produced by the spiders\\!|A thick\\, meshy web falls from somewhere above you\\, entangling you with sticky ropes\\.|The ground cracks and splits\\, and thick\\, dark green vines sprout from the earth\\, restraining you\\!|(|You are entranced by (.+)\\'s eyes\\.\\.\\. )You feel as if your entire body is entangled by sticky webs\\.)$",
+        "send": "show_important_stuff(\"you\", \"WEB\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) (is enmeshed in thick webbing produced by the spiders\\!|stares deeply into (.+) eyes\\, seemingly unable to move\\.)$",
+        "send": "show_important_stufnf(\"%<who>\", \"WEB\", \"%0\")\n"
+    },
+    {
+        "match": "^(The ground cracks and splits\\, and thick\\, dark green vines sprout from the earth\\, restraining|A thick\\, meshy web falls from somewhere above) (?P<who>.+)(\\!|\\, entangling (him|her|it) with sticky ropes\\.)$",
+        "send": "show_important_stuff(\"%<who>\", \"WEB\", \"%0\")\n"
+    },
+    {
+        "match": "^(You break free from the webs holding you in place\\!|Your mind becomes less foggy and you now have control over your actions\\.)$",
+        "send": "show_other_stuff(\"you\", \"WEB off\", \"%0\")\n"
+    },
+    {
+        "match": "^The (vines|webs) (binding|wrapped around) (?P<who>.+) (dissolve|wither and loosen)\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"WEB off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) (breaks free from the webs holding (.+) in place\\!|can now move about freely again as the forces affecting (.+) subside\\.)$",
+        "send": "show_other_stuff(\"%<who>\", \"WEB off\", \"%0\")\n"
+    },
+    {
+        "match": "You stop moving as though empowered by a whirlwind.",
+        "send": "show_important_stuff(\"you\", \"WHIRLWIND off\", \"%0\")\n"
+    },
+    {
+        "match": "^(?P<who>(@!char_name)) stops moving as though empowered by a whirlwind\\.$",
+        "send": "show_other_stuff(\"%<who>\", \"WHIRLWIND off\", \"%0\")\n"
+    },
+    {
+        "match": "The wind rushing through your body gradually slows, until its presence is gone.",
+        "send": "show_other_stuff(\"you\", \"WIND WALK off\", \"%0\")\n"
+    }
+]

@@ -8,6 +8,51 @@
 
 _pluginCreate {mmevents} {Custom events for mm-specific things like prompts};
 
+#NOP Colors.;
+#VARIABLE {MM_EVENT_COLORS} {
+    {++} {<afa>}
+    {+} {<ada>}
+    {/} {<ddd>}
+    {-} {<daa>}
+    {--} {<faa>}
+    {!++} {<808><AFA>}
+    {!+} {<808><ADA>}
+    {!/} {<808><DDD>}
+    {!-} {<808><DAA>}
+    {!--} {<808><FAA>}
+};
+
+#NOP List of supported flag types.;
+#VARIABLE {MM_SUPPORTED_FLAGS} {
+    {EVENT_CASTING} {}
+    {EVENT_AFFECTS} {}
+    {AFFECT_BUFFS} {}
+    {AFFECT_DEBUFFS} {}
+    {EVENT_HEALING} {}
+    {EVENT_RESIST} {}
+};
+
+#NOP Define flags.;
+_flagsRegisterScope {MMEVENTS};
+
+#LOCAL {item} {};
+#FOREACH {*MM_SUPPORTED_FLAGS[%*]} {item} {
+    _flagsRegisterFlag {MMEVENTS} {${item}_SELF} {1};
+    _flagsRegisterFlag {MMEVENTS} {${item}_OTHER} {1};
+    _flagsRegisterFlag {MMEVENTS} {${item}_NONE} {1};
+};
+_flagsRegisterFlag {MMEVENTS} {SHOW_ALL_AFFECTS} {0};
+_flagsRegisterFlag {MMEVENTS} {ALL_DEBUFFS_UNDESIRED} {1};
+
+#NOP Back from the dead!;
+_eventRegister {ALIVED};
+#ACTION {^The Powers take pity on you and restore your soul to your body.$} {
+    _eventFire {ALIVED};
+};
+
+#NOP Dead again.;
+_eventRegister {UNALIVED};
+
 #NOP Standard prompt;
 _eventRegister {PROMPT};
 _eventRegister {STANDARD PROMPT};
@@ -56,11 +101,22 @@ _eventRegister {WIZARD EYE};
 #NOP Movement events.
 #NOP --------------------------------------------------------------------------;
 
+#NOP Event for any time you're passively moved.;
+_eventRegister {PASSIVE MOVE};
+
 #NOP Buffeted by winds.;
 _eventRegister {BUFFETED};
 #ACTION {^You are buffeted to the %1 by crosswinds!} {
     #NOP %1 - direction;
     _eventFire {BUFFETED} {%1};
+    _eventFire {PASSIVE MOVE} {%1};
+};
+
+#NOP Moved by currents.;
+#ACTION {^The current pulls you along to the %1...} {
+    #NOP %1 - direction;
+    _eventFire {BUFFETED} {%1};
+    _eventFire {PASSIVE MOVE} {%1};
 };
 
 #NOP Unable to move in the direction you tried.
@@ -81,5 +137,593 @@ _eventRegister {ENTERED DIZZY};
     _eventFire {ENTERED DIZZY};
 };
 
+#NOP Triggered a trap!;
+_eventRegister {TRIGGERED TRAP};
+#ACTION {^ You notice %1 too late to do anything about it. $} {
+    _eventFire {TRIGGERED TRAP};
+};
 
+#ACTION {%!{(?:A|a)} powerful rune marked above the door} {
+    _eventFire {TRIGGERED TRAP};
+};
+
+#NOP When following a player as part of a form, the direction the other player;
+#NOP Moves shows on a separate line from the trigger that you follow them, so;
+#NOP We have to capture the direction in a variable so we have it for later.;
+#VARIABLE {PLAYER_MOVEMENTS} {};
+
+#ACTION {%!{^([A-Z]\w*) (?:drifts|leaves|rides|swims) (\w+).$}} {
+    #VARIABLE {PLAYER_MOVEMENTS[%1]} {$CARDINAL_DIRECTIONS[%2]};
+};
+
+_eventRegister {FOLLOWED PLAYER};
+#ACTION {%!{^You follow ([A-Z]\w*).$}} {
+    #LOCAL {player} {$player};
+    #IF {&PLAYER_MOVEMENTS[%1]} {
+        _eventFire {FOLLOWED PLAYER} {$player} {$PLAYER_MOVEMENTS[$player]};
+        _eventFire {PASSIVE MOVE} {$PLAYER_MOVEMENTS[$player]};
+    }; #ELSE {
+        _warn {Followed $player in unknown direction};
+    };
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Scan events.;
+#NOP --------------------------------------------------------------------------;
+
+_eventRegister {SCAN RESULT};
+#NOP Distance 1;
+#ACTION {%!{^(.*) is right here (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {1};
+};
+
+#NOP Distance 2;
+#ACTION {%!{^(.*) is close by (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {2};
+};
+
+#NOP Distance 3;
+#ACTION {%!{^(.*) is not far off (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {3};
+};
+
+#NOP Distance 4;
+#ACTION {%!{^(.*) is a brief walk away (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {4};
+};
+
+#NOP Distance 5;
+#ACTION {%!{^(.*) is rather far off (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {5};
+};
+
+#NOP Distance 6;
+#ACTION {%!{^(.*) is in the distance (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {6};
+};
+
+#NOP Distance 7;
+#ACTION {%!{^(.*) is almost out of sight (?:to the )?(.*)\.$}} {
+    _eventFire {SCAN RESULT} {%1} {$CARDINAL_DIRECTIONS[%2]} {7};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Flag management aliases.;
+#NOP --------------------------------------------------------------------------;
+
+_pluginCreateCommand
+    {mmevents}
+    {enableAll}
+    {_mmEventsEnableAll}
+    {Enable tracking for all events or affects}
+    {
+        {1} {Type of item (EVENT|AFFECT|ALL)}
+        {2} {Target (SELF|OTHER|NONE|ALL)}
+    };
+#ALIAS {_mmEventsEnableAll} {
+    #NOP %0;
+    _mmEventsSetAll {%1} {%2} {1};
+};
+
+_pluginCreateCommand
+    {mmevents}
+    {disableAll}
+    {_mmEventsDisableAll}
+    {Disable tracking for all events or affects}
+    {
+        {1} {Type of item (EVENT|AFFECT|ALL)}
+        {2} {Target (SELF|OTHER|NONE|ALL)}
+    };
+#ALIAS {_mmEventsDisableAll} {
+    #NOP %0;
+    _mmEventsSetAll {%1} {%2} {0};
+};
+
+#ALIAS {_mmEventsSetAll} {
+    #NOP %0;
+
+    #NOP Validate inputs.;
+    #LOCAL {type} {%1};
+    #IF {"$type" == ""} {
+        #LOCAL {type} {ALL};
+    };
+    #FORMAT {type} {%u} {$type};
+    #IF {"$type" != "EVENT" && "$type" != "AFFECT" && "$type" != "ALL"} {
+        _error {Unsupported type "$type"};
+        #RETURN;
+    };
+
+    #LOCAL {target} {%2};
+    #IF {"$target" == ""} {
+        #LOCAL {target} {ALL};
+    };
+    #FORMAT {target} {%u} {$target};
+    #IF {"$target" != "SELF" && "$target" != "OTHER" && "$target" != "NONE" && "$target" !== "ALL"} {
+        _error {Unsupported target "$target"};
+        #RETURN;
+    };
+
+    #LOCAL {item} {};
+
+    #NOP Events.;
+    #IF {"$type" == "EVENT" || "$type" == "ALL"} {
+        #FOREACH {*MM_SUPPORTED_FLAGS[EVENT_%*]} {item} {
+            #LOCAL {name} {@_stringSkip{$item; 6}};
+            _mmEventsSetFlag {EVENT} {$name} {$target} {%3};
+        };
+    };
+
+    #NOP Affects.;
+    #IF {"$type" == "AFFECT" || "$type" == "ALL"} {
+        #FOREACH {*MM_SUPPORTED_FLAGS[AFFECT_%*]} {item} {
+            #LOCAL {name} {@_stringSkip{$item; 7}};
+            _mmEventsSetFlag {AFFECT} {$name} {$target} {%3};
+        };
+    };
+};
+
+_pluginCreateCommand
+    {mmevents}
+    {enable}
+    {_mmEventsEnable}
+    {Enable tracking for an event or affect}
+    {
+        {1} {Type of item (EVENT|AFFECT)}
+        {2} {Name of item}
+        {3} {Target (SELF|OTHER|NONE|ALL)}
+    };
+#ALIAS {_mmEventsEnable} {
+    #NOP %0;
+    _mmEventsSetFlag {%1} {%2} {%3} {1};
+};
+
+_pluginCreateCommand
+    {mmevents}
+    {disable}
+    {_mmEventsDisable}
+    {Disable tracking for an event or affect}
+    {
+        {1} {Type of item (EVENT|AFFECT)}
+        {2} {Name of item}
+        {3} {Target (SELF|OTHER|NONE|ALL)}
+    };
+#ALIAS {_mmEventsDisable} {
+    #NOP %0;
+    _mmEventsSetFlag {%1} {%2} {%3} {0};
+};
+
+#NOP Set one or more flags.;
+#ALIAS {_mmEventsSetFlag} {
+    #NOP %0;
+
+    #NOP Validate inputs.;
+    #LOCAL {type} {%1};
+    #FORMAT {type} {%u} {$type};
+    #IF {"$type" != "EVENT" && "$type" != "AFFECT"} {
+        _error {Unsupported type "$type"};
+        #RETURN;
+    };
+
+    #LOCAL {name} {%2};
+    #FORMAT {name} {%u} {$name};
+    #IF {&MM_SUPPORTED_FLAGS[${type}_$name] == 0} {
+        _error {Unsupported item "$name" for type $type};
+        #RETURN;
+    };
+
+    #LOCAL {target} {%3};
+    #FORMAT {target} {%u} {$target};
+
+    #IF {"$target" == "ALL"} {
+        #NOP Change value for all 3 flags.;
+        _info {Setting $type $name to @_flagsFormatFlag{%4} for all targets};
+        _flagsSetFlag {MMEVENTS} {${type}_${name}_SELF} {%4};
+        _flagsSetFlag {MMEVENTS} {${type}_${name}_OTHER} {%4};
+        _flagsSetFlag {MMEVENTS} {${type}_${name}_NONE} {%4};
+    }; #ELSEIF {"$target" == "SELF" || "$target" == "OTHER" || "$target" == "NONE"} {
+        #NOP Change value for just one flag.;
+        _info {Setting $type $name to @_flagsFormatFlag{%4} for target $target};
+        _flagsSetFlag {MMEVENTS} {${type}_${name}_$target} {%4};
+    }; #ELSE {
+        _error {Unsupported target "$target"};
+    };
+};
+
+#FUNCTION {_mmEventsIsEnabled} {
+    #NOP Validate inputs.;
+    #LOCAL {type} {%1};
+    #FORMAT {type} {%u} {$type};
+    #IF {"$type" != "EVENT" && "$type" != "AFFECT"} {
+        _error {Unsupported type "$type"};
+        #RETURN 0;
+    };
+
+    #LOCAL {name} {%2};
+    #FORMAT {name} {%u} {$name};
+    #IF {&MM_SUPPORTED_FLAGS[${type}_$name] == 0} {
+        _error {Unsupported item "$name" for type $type};
+        #RETURN 0;
+    };
+
+    #LOCAL {target} {%3};
+    #FORMAT {target} {%u} {$target};
+    #IF {"$target" != "SELF" && "$target" != "OTHER" && "$target" != "NONE" && "$target" !== "ALL"} {
+        _error {Unsupported target "$target"};
+        #RETURN 0;
+    };
+
+    #RETURN @_flagsGetFlag{MMEVENTS; ${type}_${name}_${target}};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Affects Widget.;
+#NOP --------------------------------------------------------------------------;
+
+_widgetCreate {affectsWidget} {_mmeventsAffectsWidgetDraw};
+_pluginCreatePanel {mmevents} {affects} {Current status affects};
+_panelCreate {affects} {WIDGET} {affectsWidget};
+
+#NOP Get the sorting key for an affect based on its nature.;
+#NOP %1 - affect info (from MM_AFFECTS variable).;
+#FUNCTION {_getSortKey} {
+    #LOCAL {affect} {%1};
+    #IF {"$affect[nature]" == "++"} {
+        #LOCAL {key} {3};
+    }; #ELSEIF {"$affect[nature]" == "+"} {
+        #LOCAL {key} {4};
+    }; #ELSEIF {"$affect[nature]" == "/"} {
+        #LOCAL {key} {5};
+    }; #ELSEIF {"$affect[nature]" == "-"} {
+        #LOCAL {key} {2};
+    }; #ELSEIF {"$affect[nature]" == "--"} {
+        #LOCAL {key} {1};
+    }; #ELSE {
+        #LOCAL {key} {};
+    };
+
+    #RETURN {$key$affect[name]};
+};
+
+#ALIAS {_mmeventsAffectsWidgetDraw} {
+    #NOP %0;
+    #LOCAL {data} {%1};
+
+    #LOCAL {affects} {};
+
+    #NOP Add desired affects.;
+    #LOCAL {item} {};
+    #FOREACH {*data[desiredAffects][%*]} {item} {
+        #LOCAL {affect} {$MM_AFFECTS[$item]};
+        #LOCAL {affects[$item]} {
+            {affect} {$affect}
+            {sortKey} {@_getSortKey{{$affect}}}
+            {present} {0}
+            {desired} {1}
+        };
+    };
+
+    #NOP Option to show all or only ones that require action.;
+    #IF {@_flagsGetFlag{MMEVENTS; SHOW_ALL_AFFECTS}} {
+        #NOP Add undesired affects.;
+        #FOREACH {*data[undesiredAffects][%*]} {item} {
+            #LOCAL {affect} {$MM_AFFECTS[$item]};
+            #LOCAL {affects[$item]} {
+                {affect} {$affect}
+                {sortKey} {@_getSortKey{{$affect}}}
+                {present} {0}
+                {desired} {-1}
+            };
+        };
+
+        #NOP Add existing effects.;
+        #FOREACH {*data[presentAffects][%*]} {item} {
+            #IF {&affects[$item]} {
+                #NOP Already in the list.;
+                #LOCAL {affects[$item][present]} {1};
+            }; #ELSE {
+                #NOP Not in the list yet.;
+                #LOCAL {affect} {$MM_AFFECTS[$item]};
+                #LOCAL {affects[$item]} {
+                    {affect} {$affect}
+                    {sortKey} {@_getSortKey{{$affect}}}
+                    {present} {1}
+                    {desired} {0}
+                };
+            };
+        };
+    }; #ELSE {
+        #NOP Loop through existing effects.;
+        #FOREACH {*data[presentAffects][%*]} {item} {
+            #IF {&affects[$item]} {
+                #NOP If it's already in the list, that means it's a desired;
+                #NOP affect, and we should remove it from the list.;
+                #UNLOCAL {affects[$item]};
+            }; #ELSEIF {&data[undesiredAffects][$item] || @_flagsGetFlag{MMEVENTS; ALL_DEBUFFS_UNDESIRED} && ("$MM_AFFECTS[$item][nature]" == "-" || "$MM_AFFECTS[$item][nature]" == "--")} {
+                #NOP If it's present AND in the undesired list, show it.;
+                #LOCAL {affect} {$MM_AFFECTS[$item]};
+                #LOCAL {affects[$item]} {
+                    {affect} {$affect}
+                    {sortKey} {@_getSortKey{{$affect}}}
+                    {present} {1}
+                    {desired} {-1}
+                };
+            };
+        };
+
+    };
+
+    #NOP Read each of these items into an indexed list so we can sort it.;
+    #LOCAL {sorted} {};
+    #FOREACH {$affects[%*]} {item} {
+        #IF {$item[present] || $item[desired] == 1} {
+            #LIST {sorted} {INSERT} {-1} {$item};
+        };
+    };
+
+    #LOCAL {output} {};
+    #IF {"$sorted" != ""} {
+        #NOP Sort the list.;
+        #LIST {sorted} {INDEXATE} {sortKey};
+        #LIST {sorted} {ORDER};
+        #VARIABLE {FOO} {$sorted};
+
+        #NOP Loop through the list and build the output string.;
+        #LOCAL {first} {1};
+        #FOREACH {$sorted[%*]} {item} {
+            #NOP Figure out what color to draw.;
+            #IF {(!$item[present] && $item[desired] == 1) || ($item[present] && $item[desired] == -1)} {
+                #LOCAL {color} {$MM_EVENT_COLORS[!$item[affect][nature]]};
+            }; #ELSE {
+                #LOCAL {color} {$MM_EVENT_COLORS[$item[affect][nature]]};
+            };
+            #IF {$first} {
+                #LOCAL {output} {$color$item[affect][name]<088>};
+                #LOCAL {first} {0};
+            }; #ELSE {
+                #LOCAL {output} {$output, $color$item[affect][name]<088>};
+            };
+        };
+    };
+
+    #DRAW {$BOX_COLOR} {$BOX_STYLE} {BOX} {%2} {%3} {%4} {%5} {$output};
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Events Widget.;
+#NOP --------------------------------------------------------------------------;
+
+_bufferCreate {mmEvents} {1} {1};
+_pluginCreatePanel {mmevents} {events} {Combat and status events};
+_panelCreate {events} {BUFFER} {mmEvents};
+
+
+#NOP Name, category, target (optional, "you" or name of other),  nature (++|+|/|-|--), full captured text.;
+_eventRegister {MM EVENT};
+
+#NOP Name, category, target (optional, "you" or name of other), nature (++|+|/|-|--), ON/OFF, full captured text.;
+_eventRegister {MM AFFECT};
+
+#NOP %1 - Name;
+#NOP %2 - Tags;
+#NOP %3 - Target;
+#NOP %4 - ++|+|/|-|--;
+#NOP %5 - Captured text;
+_eventHandlerRegister {MM EVENT} {_mmEventsEventHandler};
+#ALIAS {_mmEventsEventHandler} {
+    #NOP %0;
+    #LOCAL {target} {%3};
+    #IF {"$target" != "SELF" && "$target" != "NONE"} {
+        #LOCAL {target} {OTHER};
+    };
+
+    #LOCAL {enabled} {0};
+    #LOCAL {item} {0};
+    #LOCAL {tags} {%2};
+    #FOREACH {*tags[%*]} {item} {
+        _debug {Checking for EVENT $item $target};
+        #IF {@_mmEventsIsEnabled{EVENT; $item; $target}} {
+            #LOCAL {enabled} {1};
+            #BREAK;
+        };
+    };
+
+    #IF {$enabled} {
+        _mmEventsDisplayEvent {%1} {%4};
+    };
+};
+
+#ALIAS {_mmEventsDisplayEvent} {
+    #NOP %0;
+    _bufferAdd {mmEvents} {${MM_EVENT_COLORS[%2]}%1<088>};
+};
+
+#NOP Name, category, target (optional, "you" or name of other), nature (++|+|/|-|--), ON/OFF, full captured text.;
+#NOP %1 - Name;
+#NOP %2 - Target;
+#NOP %3 - ON|OFF;
+#NOP %4 - Captured text;
+_eventHandlerRegister {MM AFFECT} {_mmEventsAffectHandler};
+#ALIAS {_mmEventsAffectHandler} {
+    #NOP %0;
+    #LOCAL {name} {%1};
+    #FORMAT {name} {%u} {$name};
+    #IF {!&MM_AFFECTS[$name]} {
+        #RETURN;
+    };
+    #LOCAL {affect} {$MM_AFFECTS[$name]};
+
+    #LOCAL {target} {%2};
+
+    #LOCAL {status} {%3};
+    #FORMAT {status} {%u} {$status};
+
+    #LOCAL {eventNature} {$affect[nature]};
+    #IF {"$status" == "OFF"} {
+        #IF {"$eventNature" == "GOOD"} {
+            #LOCAL {eventNature} {BAD};
+        }; #ELSEIF {"$eventNature" == "BAD"} {
+            #LOCAL {eventNature} {GOOD};
+        };
+    };
+    _eventFire {MM EVENT} {$affect[name] is $status} {{AFFECTS} {}} {$target} {$eventNature} {%0};
+
+    #IF {"$target" != "SELF" && "$target" != "NONE"} {
+        #LOCAL {target} {OTHER};
+    };
+
+    #LOCAL {enabled} {0};
+    #LOCAL {item} {};
+    #FOREACH {*affect[tags][%*]} {item} {
+        #IF {@_mmEventsIsEnabled{AFFECT; $item; $target}} {
+            #LOCAL {enabled} {1};
+            #BREAK;
+        };
+    };
+
+    #IF {$enabled && "$target" == "SELF"} {
+        _mmEventsUpdateAffect {$affect[name]} {$affect[nature]} {$status};
+    };
+};
+
+_pluginCreateCommand
+    {mmevents}
+    {affect}
+    {_mmEventsManuallySetAffect}
+    {Manually set the state of an affect}
+    {
+        {1} {Name of affect}
+        {2} {ON|OFF}
+    };
+#ALIAS {_mmEventsManuallySetAffect} {
+    #NOP %0;
+    #LOCAL {name} {%1};
+    #FORMAT {name} {%u} {$name};
+    #IF {&MM_AFFECTS[$name] == 0} {
+        _error {No such affect $name};
+        #RETURN;
+    };
+    #LOCAL {affect} {$MM_AFFECTS[$name]};
+
+    #LOCAL {status} {%2};
+    #FORMAT {status} {%u} {$status};
+    #IF {"$status" != "ON" && "$status" != "OFF"} {
+        _error {Invalid status $status};
+        #RETURN;
+    }
+
+    _mmEventsUpdateAffect {$affect[name]} {$affect[nature]} {$status};
+};
+
+#NOP Update the state of an affect for the widget.;
+#NOP %1 - Affect name;
+#NOP %2 - ++|+|/|-|--;
+#NOP %3 - ON|OFF;
+#ALIAS {_mmEventsUpdateAffect} {
+    #NOP %0;
+    #LOCAL {name} {%1};
+    #FORMAT {name} {%u} {$name};
+
+    #LOCAL {data} {@_widgetGetData{{affectsWidget}}};
+
+    #IF {"%3" == "OFF"} {
+        #UNLOCAL {data[presentAffects][$name]};
+    }; #ELSE {
+        #LOCAL {data[presentAffects][$name]} {};
+    };
+
+    _widgetUpdateData {affectsWidget} {$data};
+};
+
+#ALIAS {_mmEventsClearAffects} {
+    #NOP %0;
+    #LOCAL {data} {@_widgetGetData{{affectsWidget}}};
+
+    #LOCAL {data[presentAffects]} {};
+
+    _widgetUpdateData {affectsWidget} {$data};
+};
+
+_pluginCreateCommand
+    {mmevents}
+    {desiredAffect}
+    {_mmEventsDesiredAffect}
+    {Flag (or unflag) an affect as desired}
+    {
+        {1} {Name of affect}
+    }
+    {When an affect is desired, it will appear in inverse colors in the widget when it NOT present};
+#ALIAS {_mmEventsDesiredAffect} {
+    #NOP %0;
+    #LOCAL {name} {%1};
+    #FORMAT {name} {%u} {$name};
+
+    #IF {&MM_AFFECTS[$name] == 0} {
+        _error {Affect $name not defined};
+        #RETURN;
+    };
+
+    #LOCAL {data} {@_widgetGetData{{affectsWidget}}};
+
+    #IF {&data[desiredAffects][$name]} {
+        _info {$name is no longer a desired affect};
+        #UNLOCAL {data[desiredAffects][$name]};
+    }; #ELSE {
+        _info {$name is now a desired affect};
+        #LOCAL {data[desiredAffects][$name]} {};
+    };
+
+    _widgetUpdateData {affectsWidget} {$data};
+};
+
+_pluginCreateCommand
+    {mmevents}
+    {undesiredAffect}
+    {_mmEventsUndesiredAffect}
+    {Flag (or unflag) an affect as undesired}
+    {
+        {1} {Name of affect}
+    }
+    {When an affect is undesired, it will appear in inverse colors in the widget when it is present};
+#ALIAS {_mmEventsUndesiredAffect} {
+    #NOP %0;
+    #LOCAL {name} {%1};
+    #FORMAT {name} {%u} {$name};
+
+    #IF {&MM_AFFECTS[$name] == 0} {
+        _error {Affect $name not defined};
+        #RETURN;
+    };
+
+    #LOCAL {data} {@_widgetGetData{{affectsWidget}}};
+
+    #IF {&data[undesiredAffects][$name]} {
+        _info {$name is no longer an undesired affect};
+        #UNLOCAL {data[undesiredAffects][$name]};
+    }; #ELSE {
+        _info {$name is now an undesired affect};
+        #LOCAL {data[undesiredAffects][$name]} {};
+    };
+
+    _widgetUpdateData {affectsWidget} {$data};
+};
 #CLASS {mmevents} {CLOSE};
