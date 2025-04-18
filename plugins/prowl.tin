@@ -1,0 +1,273 @@
+#CLASS {prowl} {OPEN};
+
+_pluginCreate {prowl} {Automatically hunt and act on mobs};
+
+_flagsRegisterScope {PROWL};
+_flagsRegisterFlag {PROWL} {ENABLED} {0};
+
+#VARIABLE {PROWL_TARGETS} {};
+
+#VARIABLE {PROWL_ACTION} {};
+
+#VARIABLE {PROWL_INTERVAL} {};
+
+#VARIABLE {PROWL_STATE} {IDLE};
+
+#VARIABLE {PROWL_FINDINGS} {};
+
+#VARIABLE {PROWL_DELAY} {0};
+
+#VARIABLE {PROWL_HEALTH_PCT} {95};
+
+#NOP Reset the list of findings. It's a list of mobs found by distance.;
+#ALIAS {_prowlClearFindings} {
+    #VARIABLE {PROWL_FINDINGS} {
+        {1} {}
+        {2} {}
+        {3} {}
+        {4} {}
+        {5} {}
+        {6} {}
+        {7} {}
+    };
+};
+
+_pluginCreateCommand
+    {prowl}
+    {enable}
+    {_prowlEnable}
+    {Enable prowling};
+#ALIAS {_prowlEnable} {
+    #NOP %0;
+    _flagsSetFlag {PROWL} {ENABLED} {1};
+    _info {Prowl enabled};
+};
+
+_pluginCreateCommand
+    {prowl}
+    {disable}
+    {_prowlDisable}
+    {Disable prowling};
+#ALIAS {_prowlDisable} {
+    #NOP %0;
+    _flagsSetFlag {PROWL} {ENABLED} {0};
+    _info {Prowl disabled};
+};
+
+_pluginCreateCommand
+    {prowl}
+    {target}
+    {_prowlTarget}
+    {Add or remove targets}
+    {
+        {1} {ADD|REMOVE|CLEAR}
+        {2} {Target string}
+    };
+#ALIAS {_prowlTarget} {
+    #NOP %0;
+    #LOCAL {action} {%1};
+    #FORMAT {action} {%u} {$action};
+    #LOCAL {target} {%2};
+
+    #IF {"$action" == "ADD"} {
+        #LOCAL {index} {@_prowlTargetIndex{{$target}}};
+        #IF {$index > 0} {
+            _warn {Target $target already exists};
+        }; #ELSE {
+            _info {Target $target added};
+            #LIST {PROWL_TARGETS} {INSERT} {-1} {$target};
+        };
+    }; #ELSEIF {"$action" == "REMOVE"} {
+        #LOCAL {index} {@_prowlTargetIndex{{$target}}};
+        #IF {$index > 0} {
+            #LIST {PROWL_TARGETS} {DELETE} {$index};
+            _info {Target $target removed};
+        }; #ELSE {
+            _warn {Target $target not found};
+        };
+    }; #ELSEIF {"$action" == "CLEAR"} {
+        #VARIABLE {PROWL_TARGETS} {};
+        _info {Target list cleared};
+    }; #ELSE {
+        _error {Invalid action $action};
+    };
+};
+
+#FUNCTION {_prowlTargetIndex} {
+    #LOCAL {target} {%1};
+    #LOCAL {i} {};
+    #FOREACH {*PROWL_TARGETS[%*]} {i} {
+        #IF {"$PROWL_TARGETS[$i]" == "$target"} {
+            #RETURN {$i};
+        };
+    };
+
+    #RETURN {0};
+};
+
+_pluginCreateCommand
+    {prowl}
+    {action}
+    {_prowlSetAction}
+    {Set the action to take after moving to the target}
+    {
+        {1} {Action string (or blank to clear)}
+    }
+    {The string "TARGET" in your action will be replaced with the found target when invoked};
+#ALIAS {_prowlSetAction} {
+    #NOP %0;
+    #VARIABLE {PROWL_ACTION} {%1};
+    _info {Action set to %1};
+};
+
+_pluginCreateCommand
+    {prowl}
+    {interval}
+    {_prowlSetInterval}
+    {Set the interval (in seconds) to scan for targets}
+    {
+        {1} {Interval number (or blank to clear/disable)}
+    };
+#ALIAS {_prowlSetInterval} {
+    #NOP %0;
+    #IF {"%1" == "" || %1 == 0} {
+        #UNTICKER {PROWL_TICKER};
+        _info {Ticker disabled};
+    }; #ELSE {
+        #CLASS {prowl} {OPEN};
+        #TICKER {PROWL_TICKER} {
+            _prowlInvoke;
+        } {%1};
+        #CLASS {prowl} {CLOSE};
+        _info {Ticker interval set to %1};
+    };
+}
+
+_pluginCreateCommand
+    {prowl}
+    {delay}
+    {_prowlSetDelay}
+    {Set the delay (in seconds) before prowl resumes after acting}
+    {
+        {1} {Delay number (or blank to clear)}
+    };
+#ALIAS {_prowlSetDelay} {
+    #NOP %0;
+    #VARIABLE {PROWL_DELAY} {%1};
+    _info {Delay set to %1};
+};
+
+_pluginCreateCommand
+    {prowl}
+    {invoke}
+    {_prowlInvoke}
+    {Invoke the prowl algorithm};
+#ALIAS {_prowlInvoke} {
+    #NOP %0;
+    #IF {"$PROWL_STATE" != "IDLE"} {
+        #RETURN;
+    };
+    _debug {Invoking prowl algorithm};
+
+    #NOP Clear findings variable.;
+    _prowlClearFindings;
+
+    #NOP Set prowl mode and scan for target.;
+    #IF {@_flagsGetFlag{PROWL; ENABLED} && &PROWL_TARGETS[] > 0} {
+        #VARIABLE {PROWL_STATE} {SCANNING};
+    };
+    scan;
+
+    #NOP Nothing else to do here. the next prompt trigger picks up the rest.;
+};
+
+#ALIAS {_prowlAct} {
+    #NOP %0;
+    #LOCAL {i} {};
+    #LOCAL {name} {};
+    #LOCAL {direction} {};
+    #LOCAL {distance} {0};
+
+    #LOOP {1} {&PROWL_FINDINGS[]} {i} {
+        #NOP Keep going if nothing found.;
+        #IF {&PROWL_FINDINGS[$i][] == 0} {
+            #CONTINUE;
+        };
+
+        #LOCAL {name} {$PROWL_FINDINGS[$i][1][name]};
+        #LOCAL {direction} {$PROWL_FINDINGS[$i][1][direction]};
+        #LOCAL {distance} {$i};
+        #BREAK;
+    };
+
+    #IF {"$name" != "" && "$direction" != "" && $distance != 0} {
+        #VARIABLE {PROWL_STATE} {ACTING};
+        _bell ring;
+        #$distance $direction;
+
+        #LOCAL {action} {$PROWL_ACTION};
+        #REPLACE {action} {TARGET} {'$name'};
+        _debug {invoking action: $action};
+        $action;
+
+        #IF {"$PROWL_DELAY" == "" || $PROWL_DELAY == 0} {
+            #VARIABLE {PROWL_STATE} {IDLE};
+        }; #ELSE {
+            #DELAY {$PROWL_DELAY} {
+                #VARIABLE {PROWL_STATE} {IDLE};
+            };
+        };
+    }; #ELSE {
+        #VARIABLE {PROWL_STATE} {IDLE};
+    };
+};
+
+_eventHandlerRegister {SCAN RESULT} {_prowlScanResultHandler};
+#ALIAS {_prowlScanResultHandler} {
+    #NOP %0;
+    #IF {@_flagsGetFlag{PROWL; ENABLED} && "$PROWL_STATE" == "SCANNING"} {
+        _debug {Got %1 from scan};
+        #LOCAL {i} {};
+        #FOREACH {$PROWL_TARGETS[%*]} {i} {
+            #REGEXP {%1} {$i} {
+                _debug {%1 matched target $i};
+                #LIST {PROWL_FINDINGS[%3]} {INSERT} {-1} {
+                    {name} {%1}
+                    {direction} {%2}
+                };
+            };
+        };
+    };
+};
+
+_eventHandlerRegister {PROMPT} {_prowlPromptHandler};
+#ALIAS {_prowlPromptHandler} {
+    #NOP %0;
+    #IF {@_flagsGetFlag{{PROWL}; {ENABLED}} && "$PROWL_STATE" == "SCANNING"} {
+        #LOCAL {hp} {$GMCP[char][vitals][hp]};
+        #LOCAL {maxhp} {$GMCP[char][maxstats][maxhp]};
+        #IF {"$maxhp" != "" && $maxhp > 0} {
+            #LOCAL {pct} {};
+            #FORMAT {pct} {%f} {$hp / $maxhp * 100};
+            #IF {$pct >= $PROWL_HEALTH_PCT} {
+                _debug {Invoking act command};
+                _prowlAct;
+                #RETURN;
+            };
+        };
+        #VARIABLE {PROWL_STATE} {IDLE};
+    };
+};
+
+
+
+#NOP human;
+#NOP arachnid;
+#NOP horned imp;
+#NOP worker;
+#NOP bat;
+#NOP warrior;
+#NOP guard;
+#NOP slug;
+
+#CLASS {prowl} {CLOSE};
