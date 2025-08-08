@@ -101,6 +101,12 @@ _eventRegister {WIZARD EYE};
 #NOP Movement events.
 #NOP --------------------------------------------------------------------------;
 
+#NOP Event for any time you receive room data that contains the disorient flag.;
+_eventRegister {DISORIENT};
+
+#NOP Event for any time you issue a move command.;
+_eventRegister {MOVE COMMAND};
+
 #NOP Event for any time you're passively moved.;
 _eventRegister {PASSIVE MOVE};
 
@@ -130,6 +136,12 @@ _eventRegister {MOVEMENT BLOCKED};
 #ACTION {^PANIC! You couldn't escape!$} {
     _eventFire {MOVEMENT BLOCKED};
 }
+#ACTION {^But you're not fighting anyone!$} {
+    _eventFire {MOVEMENT BLOCKED};
+}
+#ACTION {^You can't do that while casting a spell!$} {
+    _eventFire {MOVEMENT BLOCKED};
+};
 
 #NOP Entered a dizzy room.;
 _eventRegister {ENTERED DIZZY};
@@ -147,19 +159,31 @@ _eventRegister {TRIGGERED TRAP};
     _eventFire {TRIGGERED TRAP};
 };
 
+#NOP Sleep/wake/stand.;
+_eventRegister {WAKE};
+#ACTION {^You wake and stand up.$} {
+    _eventFire {WAKE};
+};
+
+_eventRegister {STAND};
+#ACTION {^You scramble to your feet.$} {
+    _eventFire {STAND};
+};
+
 #NOP When following a player as part of a form, the direction the other player;
 #NOP Moves shows on a separate line from the trigger that you follow them, so;
 #NOP We have to capture the direction in a variable so we have it for later.;
 #VARIABLE {PLAYER_MOVEMENTS} {};
 
 #ACTION {%!{^([A-Z]\w*) (?:drifts|leaves|rides|swims) (\w+).$}} {
-    #VARIABLE {PLAYER_MOVEMENTS[%1]} {$CARDINAL_DIRECTIONS[%2]};
+    #VARIABLE {PLAYER_MOVEMENTS[%1]} {%2};
 };
 
 _eventRegister {FOLLOWED PLAYER};
 #ACTION {%!{^You follow ([A-Z]\w*).$}} {
-    #LOCAL {player} {$player};
+    #LOCAL {player} {%1};
     #IF {&PLAYER_MOVEMENTS[%1]} {
+        _debug {You just followed $player $PLAYER_MOVEMENTS[$player]};
         _eventFire {FOLLOWED PLAYER} {$player} {$PLAYER_MOVEMENTS[$player]};
         _eventFire {PASSIVE MOVE} {$PLAYER_MOVEMENTS[$player]};
     }; #ELSE {

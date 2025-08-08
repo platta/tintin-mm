@@ -157,6 +157,10 @@
     {nature} {++}
 };
 
+#ACTION {^A swirling rainbow aura silently shimmers into being around you.$} {
+    _eventFire {MM AFFECT} {Elemental Shield} {SELF} {ON} {%0};
+};
+
 #ACTION {^There is a faint electrical discharge as your form is surrounded by bands of multicolored light.$} {
     _eventFire {MM AFFECT} {Elemental Shield} {SELF} {ON} {%0};
 };
@@ -403,6 +407,37 @@ Apparently there's no OFF message for this...;
 };
 #NOP --------------------------------------------------------------------------;
 
+
+#NOP --------------------------------------------------------------------------;
+#NOP Web.;
+#NOP --------------------------------------------------------------------------;
+#VARIABLE {MM_AFFECTS[WEB]} {
+    {name} {Web}
+    {tags} {
+        {DEBUFFS} {}
+    }
+    {nature} {--}
+};
+
+#ACTION {%!{^(You are enmeshed in thick webbing produced by the spiders\!|A thick\, meshy web falls from somewhere above you\, entangling you with sticky ropes\.|The ground cracks and splits\, and thick\, dark green vines sprout from the earth\, restraining you\!|(|You are entranced by (.+)\'s eyes\.\.\. )You feel as if your entire body is entangled by sticky webs\.)$}} {
+    _eventFire {MM AFFECT} {Web} {SELF} {ON} {%0};
+};
+
+#ACTION {%!{^(You break free from the webs holding you in place\!|Your mind becomes less foggy and you now have control over your actions\.)$}} {
+    _eventFire {MM AFFECT} {Web} {SELF} {OFF} {%0};
+};
+
+#NOP Other resists web;
+#NOP "match": "^(?P<who>(@!char_name)) (dodges out of the way of your vines|manages to brush the spiders off him just in time)\\!$",;
+
+#NOP Other is webbed.;
+#NOP "match": "^(?P<who>(@!char_name)) (is enmeshed in thick webbing produced by the spiders\\!|stares deeply into (.+) eyes\\, seemingly unable to move\\.)$",;
+#NOP "match": "^(The ground cracks and splits\\, and thick\\, dark green vines sprout from the earth\\, restraining|A thick\\, meshy web falls from somewhere above) (?P<who>.+)(\\!|\\, entangling (him|her|it) with sticky ropes\\.)$",;
+
+#NOP Other web off.;
+#NOP "match": "^The (vines|webs) (binding|wrapped around) (?P<who>.+) (dissolve|wither and loosen)\\.$",;
+#NOP "match": "^(?P<who>(@!char_name)) (breaks free from the webs holding (.+) in place\\!|can now move about freely again as the forces affecting (.+) subside\\.)$",;
+#NOP --------------------------------------------------------------------------;
 
 
 #NOP --------------------------------------------------------------------------;

@@ -1,0 +1,208 @@
+#NOP --------------------------------------------------------------------------;
+#NOP MM Mapper utility functions.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {maputils} {open};
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Variables.;
+#NOP --------------------------------------------------------------------------;
+
+#VARIABLE {MAPPER_ROOM_COLORS} {
+    {DEFAULT} {<178>}
+    {UNVISITED} {<118>}
+    {INDOORS} {<148>}
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Functions.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Figure out what color a room should be.;
+#NOP %1 - Room data from GMCP[room][info], else current is used.;
+#FUNCTION {_maputilsGetRoomColor} {
+    #IF {"%1" != ""} {
+        #LOCAL {room} {%1};
+    }; #ELSE {
+        #LOCAL {room} {$GMCP[room][info]};
+    };
+
+    #LOCAL {roomType} {};
+    #FORMAT {roomType} {%u} {$room[terrain]_$room[terraininfo]};
+    #IF {&MAPPER_ROOM_COLORS[$roomType]} {
+        #RETURN $MAPPER_ROOM_COLORS[$roomType];
+    }; #ELSE {
+        #FORMAT {roomType} {%u} {$room[terrain]};
+        #IF {&MAPPER_ROOM_COLORS[$roomType]} {
+            #RETURN $MAPPER_ROOM_COLORS[$roomType];
+        };
+    };
+    #RETURN {$MAPPER_ROOM_COLORS[DEFAULT]};
+};
+
+#NOP Check if a room is recorded on our map.;
+#NOP %1 - Room vnum from GMCP data.;
+#FUNCTION {_maputilsIsRoomInMap} {
+    #LOCAL {exists} {0};
+    #MAP {GET} {ROOMVNUM} {exists} {%1};
+    #IF {$exists} {
+        #RETURN 1;
+    };
+
+    #RETURN 0;
+}
+
+#NOP Parse a room's flags into a variable.;
+#NOP %1 - Room data from GMCP[room][info], else current is used.;
+#FUNCTION {_maputilsGetRoomFlags} {
+    #IF {"%1" != ""} {
+        #LOCAL {room} {%1};
+    }; #ELSE {
+        #LOCAL {room} {$GMCP[room][info]};
+    };
+
+    #LOCAL {output} {};
+    #LOCAL {partial} {};
+    #LOCAL {char} {};
+    #PARSE {$room[flags]} {char} {
+        #IF {"$char" == " " || "$char" == ","} {
+            #IF {"$partial" != ""} {
+                #LOCAL {output[$partial]} {};
+            };
+            #LOCAL {partial} {};
+            #CONTINUE;
+        };
+
+        #FORMAT {partial} {%s%s} {$partial} {$char};
+    };
+
+    #IF {"$partial" != ""} {
+        #LOCAL {output[$partial]} {};
+    };
+
+    #RETURN {$output};
+};
+
+#NOP Check if a room has a flag. Don't use if checking multiple flags in one;
+#NOP spot, because of the expense of re-parsing the flags attribute. Instead,;
+#NOP use _maputilsGetRoomFlags and perform your checks locally.;
+#NOP %1 - Flag to check for.;
+#NOP %2 - Room data from GMCP[room][info], else current is used.;
+#FUNCTION {_maputilsRoomHasFlag} {
+    #IF {"%2" != ""} {
+        #LOCAL {room} {%2};
+    }; #ELSE {
+        #LOCAL {room} {$GMCP[room][info]};
+    };
+
+    #LOCAL {flags} {@_maputilsGetRoomFlags{{$room}}};
+
+    #IF {&flags[%1]} {
+        #RETURN 1;
+    };
+    #RETURN 0;
+};
+
+#NOP Construct a Room ID string.;
+#NOP %1 - Room data from GMCP[room][info]. If omitted, current GMCP data used.;
+#FUNCTION {_maputilsGetRoomId} {
+    #IF {"%1" == ""} {
+        #LOCAL {room} {$GMCP[room][info]};
+    }; #ELSE {
+        #LOCAL {room} {%1};
+    };
+
+    #LOCAL {exits} {};
+    #LOCAL {i} {};
+    #FOREACH {*room[exits][]} {i} {
+        #LOCAL {exits} {$exits$i };
+    };
+    #LOCAL {length} {};
+    #FORMAT {length} {%L} {$exits};
+    #IF {$length > 0} {
+      #MATH {length} {$length - 1};
+    };
+    #FORMAT {exits} {%.${length}s} {$exits};
+
+    #LOCAL {output} {};
+    #FORMAT {output}
+        {%s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s}
+        {$room[num]}
+        {$room[zone]}
+        {$room[name]}
+        {$exits}
+        {$room[flags]}
+        {$room[plane]}
+        {$room[shape]}
+        {$room[size]}
+        {$room[terrain]}
+        {$room[terraininfo]}
+        {$room[wilds]};
+
+    #RETURN {$output};
+};
+
+#NOP Try to find a GMCP room in our map based on its attributes.;
+#NOP %1 - Room data from GMCP[room][info]. If omitted, current GMCP data used.;
+#FUNCTION {_maputilsLocateRoom} {
+    #IF {"%1" == ""} {
+        #LOCAL {room} {$GMCP[room][info]};
+    }; #ELSE {
+        #LOCAL {room} {%1};
+    };
+
+    #MAP {LIST}
+        {$room[name]}
+        {}
+        {}
+        {$room[zone]}
+        {}
+        {$room[terrain]}
+};
+
+#NOP Check if an existing room on the local map has been visited or not.;
+#NOP %1 - vnum to check. If omitted, current local room is used.;
+#FUNCTION {_maputilsIsFirstVisit} {
+    #NOP We use the AREA property of the local map to test this. A room should;
+    #NOP always have an area set once it's been visited.;
+    #LOCAL {existingArea} {};
+    #MAP {GET} {ROOMAREA} {existingArea} {%1};
+
+    #LOCAL {firstVisit} {};
+    #MATH {firstVisit} {"$existingArea" == ""};
+    #RETURN {$firstVisit};
+};
+
+#NOP Get the state of the VTMAP flag.;
+#FUNCTION {_maputilsGetVTMAPFlag} {
+    #LOCAL {flags} {};
+    #LINE {QUIET} {#LINE {CAPTURE} {flags} {#MAP {FLAG};};};
+    #LOCAL {vtmapFlagIndex} {};
+    #LIST {flags} {FIND} {{.*}VTMAP{.*}} {vtmapFlagIndex};
+    #REGEXP {$flags[$vtmapFlagIndex]} {VTMAP FLAG IS SET TO {.*}.} {
+        #VARIABLE {__vtmapFlag} {&1};
+    } {
+        #VARIABLE {__vtmapFlag} {OFF};
+    };
+
+    #LOCAL {result} {};
+    #MATH {result} {"$__vtmapFlag" == "ON"};
+    #UNVARIABLE {__vtmapFlag};
+
+    #RETURN {$result};
+};
+
+#NOP Determine if the current room has the disorient flag.;
+#FUNCTION {_maputilsIsCurrentRoomDisorient} {
+    #VARIABLE {__dizzy} {0};
+    #REGEXP {$GMCP[room][info][flags]} {disorient} {
+        #VARIABLE {__dizzy} {1};
+    };
+
+    #LOCAL {dizzy} {$__dizzy};
+    #UNVARIABLE {__dizzy};
+
+    #RETURN {$dizzy};
+};
+
+#CLASS {maputils} {close};

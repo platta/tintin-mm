@@ -15,12 +15,20 @@ _pluginCreate {roomInfo} {Creates a panel to show info about the current room};
 _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomInfoWidgetUpdate};
 #ALIAS {_roomInfoWidgetUpdate} {
     #NOP %0;
+    #LOCAL {flags} {$GMCP[room][info][flags]};
+    #IF {"$flags" == "_empty"} {
+        #LOCAL {flags} {};
+    }; #ELSE {
+        #LOCAL {flags} {$flags | };
+    };
+
     _widgetUpdateData {roomInfoWidget} {
         {info} {
             {vnum} {$GMCP[room][info][num]}
             {zone} {$GMCP[room][info][zone]}
             {name} {$GMCP[room][info][name]}
             {terraininfo} {$GMCP[room][info][terraininfo]}
+            {flags} {$flags}
         }
         {exits} {$GMCP[room][info][exits]}
     };
@@ -78,7 +86,7 @@ _eventHandlerRegister {IAC SB GMCP room.info IAC SE} {_roomInfoWidgetUpdate};
     #MATH {width} {%5 - %3 + 1};
     #LOCAL {zone} {@_stringTruncate{{$data[zone]}; {$width}}};
     #LOCAL {name} {@_stringTruncate{{$data[name]}; {$width}}};
-    #LOCAL {terrain} {@_stringTruncate{{($data[vnum]) $data[terraininfo]}; {$width}}};
+    #LOCAL {terrain} {@_stringTruncate{{($data[vnum]) $data[flags]$data[terraininfo]}; {$width}}};
 
     #LINE IGNORE #SHOWME {${PERSONAL_COLOR}$zone\e[0m} {%2} {%3};
     #LINE IGNORE #SHOWME {\e[38;5;11m$name\e[0m} {%2 + 1} {%3};

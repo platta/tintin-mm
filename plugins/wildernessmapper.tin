@@ -1,0 +1,266 @@
+#NOP --------------------------------------------------------------------------;
+#NOP MM Wilderness Mapper class.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {wildernessmapper} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Declare plugin and flags.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Just use {map} instead.;
+#NOP _pluginCreate {wmap} {Wilderness mapping functionality};
+
+_flagsRegisterScope {WILDERNESS_MAPPER};
+
+#NOP Tells us when we've seen an event that indicates we're about to get a;
+#NOP chunk of wilderness map. Next time the prompt hits, we'll go find it.;
+_flagsRegisterFlag {WILDERNESS_MAPPER} {AWAITING_PROMPT};
+
+#NOP Should we be updating the map as we explore?;
+_flagsRegisterFlag {WILDERNESS_MAPPER} {ACTIVE} {1};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Event handlers.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP GMCP Room Data.;
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__wildernessmapperRoomInfoHandler} {1};
+#ALIAS {__wildernessmapperRoomInfoHandler} {
+    #NOP %0;
+    _trace {__wildernessmapperRoomInfoHandler};
+    #IF {!@_flagsGetFlag{{MAPPER}; {WILDERNESS}}} {
+        #RETURN;
+    };
+
+    _flagsSetFlag {WILDERNESS_MAPPER} {AWAITING_PROMPT} {1};
+};
+
+_eventHandlerRegister {WIZARD EYE} {_wildernessmapperWizardEyeHandler};
+#ALIAS {_wildernessmapperWizardEyeHandler} {
+    #NOP %0;
+    #IF {@_flagsGetFlag{{WILDERNESS_MAPPER}; {ACTIVE}}} {
+        _flagsSetFlag {WILDERNESS_MAPPER} {AWAITING_PROMPT} {1};
+    };
+};
+
+_eventHandlerRegister {SHIP SCAN} {_wildernessmapperShipScanHandler};
+#ALIAS {_wildernessmapperShipScanHandler} {
+    #NOP %0;
+    #IF {@_flagsGetFlag{{WILDERNESS_MAPPER}; {ACTIVE}}} {
+        _flagsSetFlag {WILDERNESS_MAPPER} {AWAITING_PROMPT} {1};
+    };
+};
+
+#NOP Prompt.;
+_eventHandlerRegister {PROMPT} {__wildernessmapperPromptHandler};
+#ALIAS {__wildernessmapperPromptHandler} {
+    #NOP %0;
+    _trace {__wildernessmapperPromptHandler};
+    #IF {@_flagsGetFlag{{WILDERNESS_MAPPER}; {AWAITING_PROMPT}}} {
+        #IF {@_flagsGetFlag{{WILDERNESS_MAPPER}; {ACTIVE}}} {
+            __wildernessmapperUpdateMap;
+        };
+        _flagsSetFlag {WILDERNESS_MAPPER} {AWAITING_PROMPT} {0};
+        _eventFire {WILDERNESS MAP UPDATED}
+    };
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Private Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#ALIAS {__wildernessmapperUpdateMap} {
+    #NOP %0;
+    #NOP Figure out where the top of the map circle is.;
+    #IF {!$MAPPER_MAP_LOADED} {
+        #RETURN;
+    };
+
+    #LOCAL {mapTop} {0};
+
+    #NOP If we just entered a room, look for the line that's part of the;
+    #NOP room header.;
+    #LOCAL {roomLine} {0};
+    #BUFFER {FIND} {%!{^(?:\e\[[0-9;]*m)+\(-{46}(?:\e\[[0-9;]*m)+---\)}} {roomLine};
+
+    #NOP If we just did ship scan, look for the crow's nest message.;
+    #LOCAL {shipScanLine} {0};
+    #BUFFER {FIND} {^You climb up to the crow's nest of {.*} and look in every direction.$} {shipScanLine};
+
+    #NOP If we just did wizard's eye, look for its message.;
+    #LOCAL {wizardEyeLine} {0};
+
+    #BUFFER {FIND} {%!{^(?:\e\[[0-9;]*m)+A glowing plane of light appears briefly before you:(?:\e\[[0-9;]*m)*}} {wizardEyeLine};
+    #IF {$roomLine == 0 && $shipScanLine == 0 && $wizardEyeLine == 0} {
+        #RETURN;
+    };
+
+    #IF {$roomLine > $shipScanLine && $roomLine > $wizardEyeLine} {
+        #NOP If the room line is the most recent one, the map either starts;
+        #NOP 2 or 3 lines below, depending on whether or not you have;
+        #NOP superbrief turned on.;
+        #MATH {mapTop} {$roomLine + 2};
+
+        #NOP Check for a potential extra line. If you have superbrief;
+        #NOP turned on, it won't be there. Otherwise, it will.;
+        #LOCAL {mapCheck} {};
+        #BUFFER {GET} {mapCheck} {$mapTop};
+        #IF {"$mapCheck" === ""} {
+            #MATH {mapTop} {$mapTop + 1};
+        };
+    }; #ELSEIF {$shipScanLine > $wizardEyeLine} {
+        #NOP If the ship scan line is the most recent one, the map starts;
+        #NOP on the next line.;
+        #MATH {mapTop} {$shipScanLine + 1};
+    }; #ELSE {
+        #NOP Otherwise, assume wizard eye.;
+        #MATH {mapTop} {$wizardEyeLine + 1};
+    };
+
+    #NOP Now we know where the top is. Start at the top and scan downards.;
+    #LOCAL {bufferInfo} {};
+    #BUFFER {INFO} {SAVE} {bufferInfo};
+    #LOCAL {bottomLine} {$bufferInfo[USED]};
+
+    #LOCAL {lineLengths} {};
+    #LOCAL {linesAtThisLength} {1};
+    #LOCAL {increasing} {1};
+
+    #LOCAL {i} {};
+    #LOOP {$mapTop} {$bottomLine} {i} {
+        #NOP Get the actual contents of the current line.;
+        #LOCAL {line} {};
+        #BUFFER {GET} {line} {$i};
+        #REPLACE {line} {\\} {\\};
+
+        #IF {$increasing} {
+            #NOP We are at the part where the circle is increasing in size.;
+            #LOCAL {currentLineLength} {};
+            #FORMAT {currentLineLength} {%L} {$line};
+            #IF {&lineLengths[] > 0 && $lineLengths[-1] > $currentLineLength} {
+                #NOP We hit the first line that's decreasing in width.;
+                #LOCAL {increasing} {0};
+
+                #NOP The previous line is the maximum width we expect to see.;
+                #NOP See how many lines we just saw at that maximum width. It;
+                #NOP should be an odd number. If not, quit. Also, the length of;
+                #NOP those longest lines should be odd. If not, also quit.;
+                #IF {$linesAtThisLength % 2 == 0 || $lineLengths[-1] % 2 == 0} {
+                    #RETURN {0};
+                };
+
+                #LOCAL {mapCenter} {};
+                #LOCAL {mapBottom} {};
+                #LOCAL {mapHeight} {};
+                #LOCAL {mapWidth} {};
+                #MATH {mapCenter} {$i - 1 - ($linesAtThisLength - 1) / 2};
+                #MATH {mapBottom} {$mapTop + ($mapCenter - $mapTop) * 2};
+                #MATH {mapHeight} {$mapBottom - $mapTop + 1};
+                #MATH {mapWidth} {$lineLengths[-1]}
+            };
+
+            #NOP While we're working on finding the center, have to keep track;
+            #NOP of the number of lines we've seen at the length of this line.;
+            #IF {&lineLengths[] && $lineLengths[-1] == $currentLineLength} {
+                #MATH {linesAtThisLength} {$linesAtThisLength + 1};
+            }; #ELSE {
+                #LOCAL {linesAtThisLength} {1};
+            };
+        }; #ELSE {
+            #NOP We are at the part where the circle is decreasing in size.;
+
+            #NOP Since we already saw the center, we know where the bottom;
+            #NOP should be, and that's where we'll stop. We're really only;
+            #NOP continuing just to make sure things look as expected.;
+            #IF {$i == $mapBottom} {
+                #BREAK;
+            };
+
+            #NOP Match the current line with its corresponding mirror across;
+            #NOP the center line. The lengths should match. If not, quit.;
+            #IF {$currentLineLength != $lineLengths[$mapBottom - $i + 1]} {
+                #RETURN {0};
+            };
+        };
+
+        #NOP Capture the length of this line.;
+        #LIST {lineLengths} {INSERT} {-1} {$currentLineLength};
+    };
+
+    #NOP Find the line in the center of the map circle, vertically. The length;
+    #NOP of that line tells us the width of the map circle.;
+    #LOCAL {centerLine} {};
+    #LOCAL {centerCol} {};
+    #MATH {centerLine} {($mapHeight - 1) / 2 + 1};
+    #MATH {centerCol} {($mapWidth - 1) / 2 + 1};
+
+    #NOP Using the sextant coords from GMCP, calculate the sextant coords of;
+    #NOP the top and left of the map circle.;
+    #LOCAL {sextantTop} {};
+    #LOCAL {sextantLeft} {};
+    #MATH {sextantTop} {$GMCP[room][info][coord][y] - ($mapHeight - 1) / 2};
+    #MATH {sextantLeft} {$GMCP[room][info][coord][x] - ($mapWidth - 1) / 2};
+
+    #VARIABLE {MAPPER_ROOM_DATA} {};
+    #LOCAL {roomCount} {0};
+
+    #NOP Now, loop through the rows and capture the map data.;
+    #LOOP {0} {$mapHeight - 1} {i} {
+        #NOP Buffer line number.;
+        #LOCAL {lineNumber} {};
+        #MATH {lineNumber} {$mapTop + $i};
+
+        #NOP Sextant Y coordinate.;
+        #LOCAL {mapY} {};
+        #MATH {mapY} {$sextantTop + $i};
+        #LOCAL {mapX} {$sextantLeft};
+
+        #NOP Get this line of the buffer.;
+        #LOCAL {line} {};
+        #BUFFER {GET} {line} {$lineNumber};
+        #REPLACE {line} {\\} {\\};
+
+        #LOCAL {foo} {};
+        #LOCAL {lineIndex} {};
+
+        #IF {$i >= $centerLine} {
+            #MATH {lineIndex} {$mapHeight - $i};
+        }; #ELSE {
+            #MATH {lineIndex} {$i + 1};
+        };
+        #MATH {foo} {$mapWidth - $lineLengths[$lineIndex]};
+        #VARIABLE {TEST_LINE_LENGTHS} {$lineLengths};
+
+        #LOCAL {bar} {};
+        #MATH {bar} {$mapX + $foo};
+
+        #NOP Make these transformations before calling stringSkip because;
+        #NOP otherwise it'll break;
+        #REPLACE {line} {\x7B} {(};
+        #REPLACE {line} {\x7D} {)};
+
+        #LOCAL {fooline} {@_stringSkip{{$line}; $foo}};
+
+        #NOP Make this transformation AFTER calling stringSkip because it;
+        #NOP changes the number of characters in the string.;
+        #REPLACE {fooline} {"} {\"};
+
+        #NOP Leftover from attempts to make curly braces work.;
+        #NOP #REPLACE {line} {'} {'"'"'};
+        #NOP #REPLACE {line} {\} {\\\\};
+        #NOP #REPLACE {fooline} {\x7B} {\x7B};
+        #NOP #REPLACE {fooline} {\x7D} {\x7D};
+
+        #LOCAL {result} {};
+        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$fooline"};
+
+        #NOP Leftover from attempts to make curly braces work.;
+        #NOP _debug {LINE=\$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "\$LINE"'};
+        #NOP #SCRIPT {result} {LINE=$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$LINE"'};
+        #NOP #SCRIPT {result} {bash -c 'LINE=$(echo -e "$fooline") bash -c '"'"'"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$LINE"'"'"''};
+        #NOP #SCRIPT {result} {LINE=\$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "\$LINE"'};
+        #NOP #ECHO {$result};
+    };
+};
+
+#CLASS {wildernessmapper} {CLOSE};

@@ -10,11 +10,6 @@ _pluginCreate {mm} {Materia Magica base plugin};
 #NOP mode. If we don't throttle this, the manual map can get corrupted.;
 #VARIABLE {MM_MOVE_AWAITING_PROMPT} {0};
 
-#NOP Variable to count the number of moves that have been input. For now, this;
-#NOP is a double check against the above protection, just in case. We'll see if;
-#NOP it ever actually gets tripped or not. If not maybe can remove it.;
-#VARIABLE {MM_MOVE_COUNTER} {0};
-
 #NOP --------------------------------------------------------------------------;
 #NOP Functions and Aliases the base class will call while trying to connect.;
 #NOP --------------------------------------------------------------------------;
@@ -35,19 +30,23 @@ _pluginCreate {mm} {Materia Magica base plugin};
 #ALIAS {__gameBeforeLogin} {
     #NOP %0;
     _classLoad {mmevents} {game.mm/plugins};
+    _classLoad {eventTriggers} {game.mm/plugins};
     _classLoad {captures} {game.mm/plugins};
     _classLoad {gmcp} {game.mm/plugins};
     _classLoad {magicmap} {game.mm/plugins};
+
+    _classLoad {maputils} {game.mm/plugins};
     _classLoad {mapper} {game.mm/plugins};
+    _classLoad {vtmapper} {game.mm/plugins};
+    _classLoad {wildernessmapper} {game.mm/plugins};
+
     _classLoad {autosac} {game.mm/plugins};
     _classLoad {roomInfoWidget} {game.mm/plugins};
     _classLoad {charStatsWidget} {game.mm/plugins};
     _classLoad {vitalsWidget} {game.mm/plugins};
     _classLoad {roomDetailWidget} {game.mm/plugins};
     _classLoad {combat} {game.mm/plugins};
-
-    _eventHandlerRegister {PROMPT} {_mmPromptHandler};
-    _eventHandlerRegister {MOVEMENT BLOCKED} {__mmMovementBlocked};
+    _classLoad {prowl} {game.mm/plugins};
 
     _keepalive;
 
@@ -83,6 +82,7 @@ _pluginCreate {mm} {Materia Magica base plugin};
 #NOP --------------------------------------------------------------------------;
 
 #HIGHLIGHT {^%1 is right here to the %2.} {BOLD};
+#GAG {%!{^You don't see anything (?:to the .*|(?:up|down)wards)\.$}};
 
 #NOP --------------------------------------------------------------------------;
 #NOP Shared functions and aliases.;
@@ -120,7 +120,9 @@ _pluginCreateCommand
     _panelDock {charStats} {BOTTOM} {1} {3} {6} {4};
     _panelDock {vitals} {BOTTOM} {1} {1} {6} {2};
 
-    _panelDock {map} {RIGHT} {1} {1} {6} {6};
+    _panelDock {map} {RIGHT} {1} {1} {5} {6};
+    _panelDock {affects} {RIGHT} {6} {1} {6} {3};
+    _panelDock {events} {RIGHT} {6} {4} {6} {6};
     #NOP _panelDock {roomDetail} {RIGHT} {6} {1} {6} {6};
 };
 
@@ -144,7 +146,9 @@ _pluginCreateCommand
     _panelDock {roomInfo} {BOTTOM} {1} {4} {6} {6};
     _panelDock {vitals} {BOTTOM} {1} {1} {6} {3};
 
-    _panelDock {map} {RIGHT} {1} {1} {6} {6};
+    _panelDock {map} {RIGHT} {1} {1} {5} {6};
+    _panelDock {affects} {RIGHT} {6} {1} {6} {6};
+    _panelHide {events};
     #NOP _panelHide {roomDetail} {RIGHT} {6} {1} {6} {6};
 };
 
@@ -163,41 +167,38 @@ _eventHandlerRegister {SESSION ACTIVATED} {_mmSessionActivatedHandler};
     };
 };
 
-
-#NOP Handle prompt;
-#ALIAS {_mmPromptHandler} {
-    #NOP %0;
-    #VARIABLE {MM_MOVE_AWAITING_PROMPT} {0};
-};
-
-#ALIAS {__mmMovementBlocked} {
-    #NOP %0;
-    #IF {$MANUAL_MAP_MODE && !$MAPPER_DIZZY} {
-        #MATH {MM_MOVE_COUNTER} {$MM_MOVE_COUNTER - 1};
-    };
-};
-
 #NOP Movement wrapper.;
+#NOP %1 - command/direction.;
 #ALIAS {_mmMove} {
     #NOP %0;
+    #NOP %1 is either a direction, "look" or "flee <direction>".;
+    #LOCAL {command} {%1};
+    #LIST {command} {EXPLODE} { };
+    #IF {&command[] == 1} {
+        #NOP No spaces in string, not fleeing.;
+        #LOCAL {direction} {$command[1]};
+    }; #ELSE {
+        #NOP Fleeing.;
+        #LOCAL {direction} {$command[2]};
+    };
 
-    #IF {$MANUAL_MAP_MODE} {
-        #IF {$MM_MOVE_AWAITING_PROMPT} {
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        #IF {@_flagsGetFlag{{VT_MAPPER}; {MOVE_RELATED_COMMAND_ISSUED}}} {
             _warn {SLOWWWWW DOWWWNNNNNNN};
             _bell ring;
+            #LIST {VT_MAPPER_MOVEMENT_QUEUE} {INSERT} {-1} {%1};
             #RETURN;
         };
 
-        #VARIABLE {MM_MOVE_AWAITING_PROMPT} {1};
-        #MATH {MM_MOVE_COUNTER} {$MM_MOVE_COUNTER + 1};
-
         #LINE {IGNORE} {%1};
 
-        #IF {"%1" != "l" && "%1" != "look"} {
-            #MAP {MOVE} {%1};
+        #IF {"$direction" != "l" && "$direction" != "look"} {
+            #MAP {MOVE} {$direction};
         };
+        _eventFire {MOVE COMMAND} {$direction};
     }; #ELSE {
-      #LINE {IGNORE} {%1};
+        _eventFire {MOVE COMMAND} {$direction};
+        #LINE {IGNORE} {%1};
     };
 };
 
@@ -213,6 +214,9 @@ _eventHandlerRegister {SESSION ACTIVATED} {_mmSessionActivatedHandler};
 #ALIAS {^d$} {_mmMove {d};};
 #ALIAS {^l$} {_mmMove {look};};
 #ALIAS {^look$} {_mmMove {look};};
+#ALIAS {^fl %1} {_mmMove {flee %1}};
+#ALIAS {^fle %1} {_mmMove {flee %1}};
+#ALIAS {^flee %1} {_mmMove {flee %1}};
 
 #NOP Numpad movement.;
 _eventHandlerRegister {NUMPAD 8} {_mmNumpad8Handler};
@@ -273,7 +277,7 @@ _eventHandlerRegister {NUMPAD MINUS} {_mmNumpadMinusHandler};
 _eventHandlerRegister {NUMPAD 0} {_mmNumpad0Handler};
 #ALIAS {_mmNumpad0Handler} {
     #NOP %0;
-    scan;
+    _prowlInvoke;
 };
 
 #NOP Numpad looking.;

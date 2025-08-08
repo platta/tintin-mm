@@ -1,0 +1,1149 @@
+#NOP --------------------------------------------------------------------------;
+#NOP MM VT Mapper class.;
+#NOP --------------------------------------------------------------------------;
+#CLASS {vtmapper} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Declare plugin and flags.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Just use {map} instead.;
+#NOP _pluginCreate {vmap} {VT Mapper Functionality};
+_flagsRegisterScope {VT_MAPPER};
+
+#NOP Has the map been loaded from file.;
+_flagsRegisterFlag {VT_MAPPER} {LOADED} {0};
+
+#NOP Should we be updating the map as we explore?;
+_flagsRegisterFlag {VT_MAPPER} {ACTIVE} {0};
+
+#NOP Flag to pause all mapping activity from this plugin.;
+_flagsRegisterFlag {VT_MAPPER} {PAUSED} {0};
+
+#NOP Flag to toggle between automatic (using GMCP) and manual map operations.;
+_flagsRegisterFlag {VT_MAPPER} {MANUAL} {0};
+
+#NOP Flag to indicate that we've received GMCP room data we haven't processed;
+#NOP yet. This is only used in manual mapping mode;
+_flagsRegisterFlag {VT_MAPPER} {NEW_ROOM_INFO} {0};
+
+#NOP Flag to tell us when we've issued a move command. The expectation is that;
+#NOP before we receive the next prompt from the game we should have received;
+#NOP GMCP room data. Also this out. move "related" command will be all. Move;
+#NOP command will be only for commands that should make you move to a new room.;
+#NOP Look command is for the look command, which should give us a GMCP payload,;
+#NOP but not move us to a different room.;
+_flagsRegisterFlag {VT_MAPPER} {MOVE_RELATED_COMMAND_ISSUED} {0};
+_flagsRegisterFlag {VT_MAPPER} {MOVE_COMMAND_ISSUED} {0};
+_flagsRegisterFlag {VT_MAPPER} {LOOK_COMMAND_ISSUED} {0};
+
+#NOP Flag to tell us if we've passively moved. The expectation is that if we;
+#NOP get new GMCP room data and haven't issued a move command that we must have;
+#NOP been passively moved.; If not, we know we're falling out of sync.;
+_flagsRegisterFlag {VT_MAPPER} {PASSIVELY_MOVED} {0};
+
+#NOP Flag to tell us if we've detected movement being blocked somehow.
+_flagsRegisterFlag {VT_MAPPER} {MOVEMENT_BLOCKED} {0};
+
+#NOP If we're in manual mapping mode and some time-triggered message comes;
+#NOP through, it could cause a false positive where we think we were supposed;
+#NOP to move, but didn't move. When we hit that case, throw this flag and wait;
+#NOP until the next prompt without resetting the flags. At that point, then;
+#NOP make a fuss about falling out of sync.;
+#NOP _flagsRegisterFlag {VT_MAPPER} {WAIT_FOR_SECOND_PROMPT} {0};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Variables and lookup tables.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Count the number of prompts we've received while waiting for movement;
+#NOP events to line up. We expect that if active or passive movement (or the ;
+#NOP look command) has occurred that we should also receive a GMCP room payload;
+#NOP to close the loop. Normally, the action and GMCP payload arrive before the;
+#NOP first prompt that occurs after they happen. But, sometimes, timed messages;
+#NOP from the game (e.g. when panic from fleeing combat ends) add additional;
+#NOP prompts in between action and GMCP receipt. It's also possible that we;
+#NOP have fallen out of sync with current state because we missed a trigger and;
+#NOP the hard part is telling the difference.;
+#VARIABLE {VT_MAPPER_MOVEMENT_PROMPT_COUNT} {0};
+
+#NOP Set a value after which point we consider a move/GMCP discrepancy to be an;
+#NOP error.;
+#VARIABLE {VT_MAPPER_MOVEMENT_PROMPT_THRESHOLD} {5};
+
+#NOP Queue to hold move commands when we try to go too fast in manual mode.;
+#VARIABLE {VT_MAPPER_MOVEMENT_QUEUE} {};
+
+#NOP Map weights for various terrains.;
+#NOP This helps the mapper calculate better paths (i.e. it'll prefer roads).;
+#VARIABLE {VT_MAPPER_TERRAIN_WEIGHT} {
+    {paved road} {0.005}
+    {city street} {0.005}
+    {craggy mountain} {10}
+    {deep water} {50}
+    {dense forest} {10}
+    {fresh-water-swimmable} {50}
+    {jungle} {10}
+    {light forest} {5}
+    {mountainous} {25}
+    {rocky ground} {10}
+    {salt water} {50}
+    {shallow water} {50}
+    {stream} {50}
+    {underwater} {50}
+};
+
+#VARIABLE {VT_MAPPER_ROOM_TYPES} {
+    {HOUSE} {
+        {roomcolor} {<048>}
+    }
+
+    {SHOP} {
+        {roomcolor} {<168>}
+        {descriptions} {
+            {A} {armor shop}
+            {W} {weapon shop}
+            {M} {magic shop}
+            {I} {inn}
+            {H} {healer}
+            {T} {tavern}
+            {G} {general store}
+            {P} {post office}
+            {B} {blacksmith}
+            {$} {bank}
+        }
+    }
+
+    {TRAINER} {
+        {roomcolor} {<158>}
+        {descriptions} {
+            {W} {weapon trainer}
+            {M} {magic trainer}
+        }
+    }
+
+    {QUEST} {
+        {roomcolor} {<138>}
+        {symbol} {Q}
+    }
+};
+
+#NOP Amount of time in seconds in between steps when running on a speedwalk.;
+#VARIABLE {VT_MAPPER_SPEEDWALK_DELAY} {0};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Public Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+_pluginCreateCommand
+    {map}
+    {hide}
+    {_vtmapperHide}
+    {Mark an exit as hidden on the map.}
+    {
+        {1} {Exit direction to hide}
+    }
+    {When hiding an exit, the map will still show that an exit exists in that direction, but the rooms in that direction won't be shown until you move there.};
+#ALIAS {_vtmapperHide} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {"%1" == ""} {
+        _error {Must specify exit direction to hide};
+        #RETURN;
+    };
+
+    #MAP {EXITFLAG} {%1} {HIDE} {ON};
+};
+
+_pluginCreateCommand
+    {map}
+    {unhide}
+    {_vtmapperUnhide}
+    {Mark an exit as visible on the map.}
+    {
+        {1} {Exit direction to unhide}
+    }
+    {When hiding an exit, the map will still show that an exit exists in that direction, but the rooms in that direction won't be shown until you move there.};
+#ALIAS {_vtmapperUnhide} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {"%1" == ""} {
+        _error {Must specify exit direction to unhide};
+        #RETURN;
+    };
+
+    #MAP {EXITFLAG} {%1} {HIDE} {OFF};
+};
+
+_pluginCreateCommand
+    {map}
+    {mark}
+    {_vtmapperMark}
+    {Marks the current room with a predefined type}
+    {
+        {1} {Type name}
+        {2} {Symbol to apply to room}
+        {3} {Description to apply to room}
+    };
+#ALIAS {_vtmapperMark} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #LOCAL {type} {%1};
+    #FORMAT {type} {%u} {$type};
+
+    #IF {!&VT_MAPPER_ROOM_TYPES[$type]} {
+        _error {No room type defined for $type};
+        #RETURN;
+    };
+
+    #IF {&VT_MAPPER_ROOM_TYPES[$type][roomcolor]} {
+        #MAP {SET} {ROOMCOLOR} {$VT_MAPPER_ROOM_TYPES[$type][roomcolor]};
+    };
+
+    #MAP {SET} {ROOMSYMBOL} {%2};
+
+    #IF {"%3" != ""} {
+        #MAP {SET} {ROOMDESC} {%3};
+    }; #ELSEIF {&VT_MAPPER_ROOM_TYPES[$type][descriptions][%2]} {
+        #MAP {SET} {ROOMDESC} {$VT_MAPPER_ROOM_TYPES[$type][descriptions][%2]};
+    }; #ELSE {
+        #MAP {SET} {ROOMDESC} {};
+    };
+};
+
+_pluginCreateCommand
+    {map}
+    {setSpeedWalkDelay}
+    {_vtmapperSetSpeedwalkDelay};
+    {Sets the amount of time between moves while speedwalking.;}
+    {
+        {1} {Delay (in seconds)}
+    };
+#ALIAS {_vtmapperSetSpeedwalkDelay} {
+    #NOP %0;
+    #VARIABLE {VT_MAPPER_SPEEDWALK_DELAY} {%1};
+    _info {Speedwalk delay set to %1};
+};
+
+_pluginCreateCommand
+    {map}
+    {stopSpeedwalk}
+    {_vtmapperStopSpeedwalk}
+    {Stop an in-progress speedwalk};
+#ALIAS {_vtmapperStopSpeedwalk} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #NOP Determine if a path is defined.;
+    #LOCAL {length} {};
+    #PATH {GET} {LENGTH} {length};
+
+    #NOP Determine if we're currently running.;
+    #LOCAL {running} {};
+    #PATH {GET} {RUNNING} {running};
+
+    #IF {$running > 0} {
+        #PATH {STOP};
+    };
+
+    #IF {$length > 0} {
+        #PATH {DESTROY};
+    };
+
+    _debug {Speedwalk stopped and path destroyed.};
+};
+
+#NOP Shortcut for finding a room by its description and moving there.;
+#NOP %1 - Room description to search.;
+_pluginCreateCommand
+    {map}
+    {go}
+    {_vtmapperGo}
+    {Go to a specified room by description or vnum}
+    {
+        {1} {Room description or vnum}
+    }
+    {This relies on room descriptions being set manually while mapping};
+#ALIAS {_vtmapperGo} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    _vtmapperStopSpeedwalk;
+    #IF {@_maputilsIsRoomInMap{{%1}}} {
+        #LINE {QUIET} {#MAP {FIND} {%1}};
+    }; #ELSE {
+        #LINE QUIET {#MAP {FIND} {} {} {%1}};
+    };
+    #LOCAL {length} {};
+    #PATH {GET} {LENGTH} {length};
+
+    #IF {$length == 0} {
+        _warn {GMCP Mapper: Not found or already there};
+        #PATH {DESTROY};
+    }; #ELSEIF {$length <= 100} {
+        #IF {$VT_MAPPER_SPEEDWALK_DELAY} {
+            #PATH {RUN} {$VT_MAPPER_SPEEDWALK_DELAY};
+        }; #ELSE {
+            #NOP Even if the delay is zero, passing it affects the run logic.;
+            #PATH {RUN};
+        };
+    }; #ELSE {
+        _warn {GMCP Mapper: Room is too far away (> 100 rooms)};
+        #PATH {DESTROY};
+    };
+};
+
+
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Event handlers.;
+#NOP --------------------------------------------------------------------------;
+
+#ALIAS {__checkForMovingIntoManual} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}} || @_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        #RETURN;
+    };
+
+    _trace {__checkForMovingIntoManual %1};
+
+    #LOCAL {localExits} {};
+    #MAP {GET} {ROOMEXITS} {localExits};
+    #IF {&localExits[%1]} {
+        #NOP Potentially moving into an existing room created from manual;
+        #NOP mapping. Check if the area of the room starts with "MANUAL ".;
+        #LOCAL {otherRoomArea} {};
+        #MAP {GET} {ROOMAREA} {otherRoomArea} {$localExits[%1]};
+
+        #LOCAL {startsWith} {};
+        #FORMAT {startsWith} {%.7s} {$otherRoomArea};
+
+        #IF {"$startsWith" == "MANUAL "} {
+            __vtmapperStartManualMapping;
+            #MAP {MOVE} {%1};
+        };
+    }; #ELSE {
+        #NOP No local exit exists. Check the GMCP data for one. If it exists,;
+        #NOP Then turn on manual mapping.;
+        #IF {&GMCP[room][info][exits][%1] && $GMCP[room][info][exits][%1] == -99} {
+            __vtmapperStartManualMapping;
+            #MAP {DIG} {%1};
+            #MAP {MOVE} {%1};
+        };
+    };
+}
+
+#NOP When we wake up, consider it a passive move so we're expecting a GMCP;
+#NOP payload.;
+_eventHandlerRegister {WAKE} {__vtmapperWakeHandler};
+#ALIAS {__vtmapperWakeHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        _flagsSetFlag {VT_MAPPER} {PASSIVELY_MOVED} {1};
+    };
+};
+
+#NOP If we stand while in a state where a move command was issued, that means;
+#NOP our movement was blocked.;
+_eventHandlerRegister {STAND} {__vtmapperStandHandler};
+#ALIAS {__vtmapperStandHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}} && @_flagsGetFlag{{VT_MAPPER}; {MOVE_COMMAND_ISSUED}}} {
+        #NOP Undo whatever we just did.;
+        __vtmapperMovementWasBlocked;
+    };
+};
+
+#NOP Move command issues.;
+_eventHandlerRegister {MOVE COMMAND} {__vtmapperMoveCommandHandler};
+#ALIAS {__vtmapperMoveCommandHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    _trace {__vtmapperMoveCommandHandler};
+
+    #IF {"%1" != "l" && "%1" != "look"} {
+        #IF {&CARDINAL_DIRECTIONS[%1]} {
+            __checkForMovingIntoManual {$CARDINAL_DIRECTIONS[%1]};
+        }; #ELSE {
+            __checkForMovingIntoManual {%1};
+        };
+    };
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        _flagsSetFlag {VT_MAPPER} {MOVE_RELATED_COMMAND_ISSUED} {1};
+        #IF {"%1" == "l" || "%1" == "look"} {
+            _flagsSetFlag {VT_MAPPER} {LOOK_COMMAND_ISSUED} {1};
+        }; #ELSE {
+            _flagsSetFlag {VT_MAPPER} {MOVE_COMMAND_ISSUED} {1};
+        };
+    };
+};
+
+#NOP GMCP Room Data.;
+_eventHandlerRegister {IAC SB GMCP room.info IAC SE} {__vtmapperRoomInfoHandler};
+#ALIAS {__vtmapperRoomInfoHandler} {
+    #NOP %0;
+    #NOP If the map isn't loaded, or we're paused, don't do anything.;
+    _trace {__vtmapperRoomInfoHandler};
+    #LOCAL {room} {$GMCP[room][info]};
+
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}} || @_flagsGetFlag{{VT_MAPPER}; {PAUSED}}} {
+        _eventFire {VT MAP UPDATED};
+        #RETURN;
+    };
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        #NOP Manual mapping mode.;
+        #IF {$room[num] > 0} {
+            #NOP If we're in manual mode, but we land in a real room, turn off;
+            #NOP manual mode automatically.;
+            _debug {Real room detected. Disabling manual mapping.};
+            __vtmapperStopManualMapping;
+            __vtmapperRoomInfoHandler_GMCP;
+        }; #ELSE {
+            #NOP Just set a flag here. We'll update upon receiving prompt.;
+            _flagsSetFlag {VT_MAPPER} {NEW_ROOM_INFO} {1};
+        };
+    }; #ELSE {
+        #NOP GMCP mapping mode.;
+        __vtmapperRoomInfoHandler_GMCP;
+    };
+
+    #IF {@_maputilsIsCurrentRoomDisorient{}} {
+        _eventFire {DISORIENT};
+    }; #ELSEIF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}} && @_flagsGetFlag{{VT_MAPPER}; {PAUSED}}} {
+        _warn {Moving through rooms while paused. Manual mapping will fall out of sync!};
+    };
+};
+
+#NOP Prompt.;
+_eventHandlerRegister {PROMPT} {__vtmapperPromptHandler};
+#ALIAS {__vtmapperPromptHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    _trace {__vtmapperPromptHandler};
+
+    #LOCAL {resetFlags} {1};
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        #IF {!@_flagsGetFlag{{VT_MAPPER}; {PAUSED}}} {
+            #IF {@_flagsGetFlag{{VT_MAPPER}; {NEW_ROOM_INFO}}} {
+                #NOP This means there's new GMCP data. In manual mode, we wait;
+                #NOP until we receive the prompt because if we've been;
+                #NOP passively moved (following in a form or buffeted by winds);
+                #NOP we don't see that until AFTER the GMCP payload comes in.;
+                #IF {@_flagsGetFlag{{VT_MAPPER}; {MOVE_RELATED_COMMAND_ISSUED}} || @_flagsGetFlag{{VT_MAPPER}; {PASSIVELY_MOVED}}} {
+                    #NOP Getting here means we have new room data AND we either;
+                    #NOP tried to move or detected a passive move.;
+                    #IF {$VT_MAPPER_MOVEMENT_PROMPT_COUNT > 0} {
+                        _info {Resolved movement discrepancy after $VT_MAPPER_MOVEMENT_PROMPT_COUNT prompts};
+                    };
+                    __vtmapperRoomInfoHandler_Manual;
+                }; #ELSE {
+                    #NOP If we got here, we've fallen out of sync. We moved or;
+                    #NOP something moved us, and the code didn't detect it,;
+                    #NOP which means our local mapper hasn't moved even though;
+                    #NOP GMCP is telling us there's new room data.;
+                    _error {NEW ROOM DATA RECEIVED WITHOUT MOVE DETECTED!};
+                    #NOP _vtmapperPause;
+                };
+            }; #ELSE {
+                #NOP If we haven't received new room info, but a move command;
+                #NOP was issued, that means something stopped us from moving.;
+                #NOP If the MOVEMENT_BLOCKED flag is set, that means we caught;
+                #NOP the fact that something stopped us from moving, but if not;
+                #NOP that means we are EXPECTING to get to a new room, but;
+                #NOP didn't somehow. Note, this also considers "look" a move;
+                #NOP command because even though we don't go to a "new" room,;
+                #NOP we do still expect to get a new GMCP payload.;
+                #IF {(@_flagsGetFlag{{VT_MAPPER}; {MOVE_COMMAND_ISSUED}} || @_flagsGetFlag{{VT_MAPPER}; {PASSIVELY_MOVED}}) && !@_flagsGetFlag{{VT_MAPPER}; {MOVEMENT_BLOCKED}}} {
+                    #IF {$VT_MAPPER_MOVEMENT_PROMPT_COUNT > $VT_MAPPER_MOVEMENT_PROMPT_THRESHOLD} {
+                        _error {DETECTED MOVE BUT DIDN'T GET A GMCP ROOM PAYLOAD!};
+
+                        #NOP Undo whatever we just did on the map.;
+                        __vtmapperMovementWasBlocked;
+                        #NOP _vtmapperPause;
+                    }; #ELSE {
+                        #NOP _flagsSetFlag {VT_MAPPER} {WAIT_FOR_SECOND_PROMPT} {1};
+                        #MATH {VT_MAPPER_MOVEMENT_PROMPT_COUNT} {$VT_MAPPER_MOVEMENT_PROMPT_COUNT + 1};
+                        #LOCAL {resetFlags} {0};
+                    };
+                };
+                #NOP No ELSE here, because it just means we're doing some non-;
+                #NOP movement related activity that's giving us a new prompt.;
+            };
+        };
+    };
+
+    #NOP Reset flags.;
+    #IF {$resetFlags} {
+        _flagsSetFlag {VT_MAPPER} {NEW_ROOM_INFO} {0};
+        _flagsSetFlag {VT_MAPPER} {MOVE_RELATED_COMMAND_ISSUED} {0};
+        _flagsSetFlag {VT_MAPPER} {MOVE_COMMAND_ISSUED} {0};
+        _flagsSetFlag {VT_MAPPER} {LOOK_COMMAND_ISSUED} {0};
+        _flagsSetFlag {VT_MAPPER} {MOVEMENT_BLOCKED} {0};
+        _flagsSetFlag {VT_MAPPER} {PASSIVELY_MOVED} {0};
+        #NOP _flagsSetFlag {VT_MAPPER} {WAIT_FOR_SECOND_PROMPT} {0};
+        #VARIABLE {VT_MAPPER_MOVEMENT_PROMPT_COUNT} {0};
+
+        #IF {&VT_MAPPER_MOVEMENT_QUEUE[]} {
+            #LOCAL {nextMove} {$VT_MAPPER_MOVEMENT_QUEUE[-1]};
+            _mmMove {$nextMove};
+            #LIST {VT_MAPPER_MOVEMENT_QUEUE} {DELETE} {-1};
+        };
+    };
+};
+
+#NOP Passive movement.;
+_eventHandlerRegister {PASSIVE MOVE} {__vtmapperPassiveMoveHandler};
+#ALIAS {__vtmapperPassiveMoveHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    _trace {__vtmapperPassiveMoveHandler %1};
+
+    __checkForMovingIntoManual {$CARDINAL_DIRECTIONS[%1]};
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}} && !@_flagsGetFlag{{VT_MAPPER}; {PAUSED}}} {
+        _debug {Digging to the %1, $CARDINAL_DIRECTIONS[%1]};
+        #MAP {DIG} {$CARDINAL_DIRECTIONS[%1]};
+        #MAP {MOVE} {$CARDINAL_DIRECTIONS[%1]};
+        _flagsSetFlag {VT_MAPPER} {PASSIVELY_MOVED} {1};
+    };
+};
+
+#NOP Movement blocked.;
+_eventHandlerRegister {MOVEMENT BLOCKED} {__vtmapperMovementBlockedHandler};
+#ALIAS {__vtmapperMovementBlockedHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #NOP If we're in manual mapping mode, the fact that we just TRIED to move;
+    #NOP means the mapper DID move. Since we know that movement was blocked,;
+    #NOP We need to undo whatever the mapper just did.;
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}} && @_flagsGetFlag{{VT_MAPPER}; {MOVE_COMMAND_ISSUED}}} {
+        __vtmapperMovementWasBlocked;
+    };
+};
+
+#NOP Triggered trap.;
+_eventHandlerRegister {TRIGGERED TRAP} {__vtmapperTriggeredTrapHandler};
+#ALIAS {__vtmapperTriggeredTrapHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        #NOP This event isn't triggered reliably, and also can be from the room;
+        #NOP itself or a specific entrance, so scrap this for now.;
+        #NOP #MAP {SET} {ROOMSYMBOL} {T};
+    };
+};
+
+#NOP Session disconnect.;
+_eventHandlerRegister {SESSION DISCONNECTED} {__vtmapperSessionDisconnectedHandler};
+#ALIAS {__vtmapperSessionDisconnectedHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+    _vtmapperSave;
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Events raised by this class.;
+#NOP --------------------------------------------------------------------------;
+
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Functions.;
+#NOP --------------------------------------------------------------------------;
+
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Public Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Deal with a dizzy room in transient spaces.
+_pluginCreateCommand
+    {map}
+    {dizzy}
+    {_vtmapperDizzy}
+    {Pause manual mapping because you're stuck in a dizzy room};
+#ALIAS {_vtmapperDizzy} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        _warn {DIZZY: This function is only supported while manually mapping};
+        #RETURN;
+    };
+
+    _vtmapperPause;
+};
+
+#NOP Undo the dizzy setting.;
+_pluginCreateCommand
+    {map}
+    {undizzy}
+    {_vtmapperUndizzy}
+    {Resume manual mapping after escaping a dizzy room}
+    {
+        {1} {Direction you moved from the dizzy room}
+    };
+#ALIAS {_vtmapperUndizzy} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        _warn {UNDIZZY: This function is only supported while manually mapping};
+        #RETURN;
+    };
+
+    #IF {"%1" == ""} {
+        _error {No direction provided};
+        #RETURN;
+    };
+
+    #MAP {FLAG} {NOFOLLOW} {OFF};
+    #MAP {FLAG} {STATIC} {OFF};
+
+    #MAP {MOVE} {%1};
+
+    __vtmapperRoomInfoHandler_Manual;
+
+    _vtmapperUnpause;
+};
+
+_pluginCreateCommand
+    {map}
+    {load}
+    {_vtmapperLoad}
+    {Load the map file from disk}
+    {
+        {1} {(0|1) Load in active mode (default 1)}
+    }
+    {When in active mode, updates to the map will be written to disk on disconnect. If you are playing multiple characters at once, only one should be in active mode, or else the map file could become corrupted.};
+#ALIAS {_vtmapperLoad} {
+    #NOP %0;
+    #NOP Parse argument %1.;
+    #LOCAL {active} {};
+    #IF {"%1" == "0"} {
+        #LOCAL {active} {0};
+    }; #ELSE {
+        #LOCAL {active} {1};
+    };
+
+    #NOP Read the map file.;
+    #MAP {READ} {$__base/game.mm/gmcp.map};
+
+    #NOP Try to go to current room.;
+    #IF {&GMCP[room][info][num] && $GMCP[room][info][num] > 0} {
+        #NOP GMCP events have been firing, and we know what room we're in.;
+        #MAP {GOTO} {$GMCP[room][info][num]};
+    }; #ELSE {
+        #NOP Just go to a room to ensure we properly enter the map.;
+        #MAP {GOTO} {1};
+    };
+    #MAP {FLAG} {VTMAP} {OFF};
+
+    _flagsSetFlag {VT_MAPPER} {LOADED} {1};
+    _flagsSetFlag {VT_MAPPER} {ACTIVE} {$active};
+
+    _info {VT map loaded from file};
+    _eventFire {VT MAP LOADED};
+    _eventFire {VT MAP UPDATED};
+};
+
+_pluginCreateCommand
+    {map}
+    {save}
+    {_vtmapperSave}
+    {Save the map file to disk};
+#ALIAS {_vtmapperSave} {
+    #NOP %0;
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {LOADED}} && @_flagsGetFlag{{VT_MAPPER}; {ACTIVE}}} {
+        #MAP {WRITE} {$__base/game.mm/gmcp.map};
+    };
+};
+
+_pluginCreateCommand
+    {map}
+    {pause}
+    {_vtmapperPause}
+    {Pause all mapping activity};
+#ALIAS {_vtmapperPause} {
+    #NOP %0;
+    #MAP {FLAG} {NOFOLLOW} {ON};
+    #MAP {FLAG} {STATIC} {ON};
+    _flagsSetFlag {VT_MAPPER} {PAUSED} {1};
+};
+
+_pluginCreateCommand
+    {map}
+    {unpause}
+    {_vtmapperUnpause}
+    {Unpause all mapping activity};
+#ALIAS {_vtmapperUnpause} {
+    #NOP %0;
+    #MAP {FLAG} {NOFOLLOW} {OFF};
+    #MAP {FLAG} {STATIC} {OFF};
+    _flagsSetFlag {VT_MAPPER} {PAUSED} {0};
+};
+
+_pluginCreateCommand
+    {map}
+    {manual}
+    {_vtmapperManualMapping}
+    {Start or stop manual mapping mode}
+    {
+        {1} {(START|STOP|CLEAR|LOCATE) Start or stop manual mapping, clear recorded map data, or try to locate your current room.}
+        {2} {(CLEAR only) Real name of the zone whose manually mapped rooms you'd like to clear.}
+    };
+#ALIAS {_vtmapperManualMapping} {
+    #NOP %0;
+    #LOCAL {action} {%1};
+    #FORMAT {action} {%u} {$action};
+
+    #IF {"$action" == "START"} {
+        __vtmapperStartManualMapping;
+    }; #ELSEIF {"$action" == "STOP"} {
+        __vtmapperStopManualMapping;
+    }; #ELSEIF {"$action" == "CLEAR"} {
+        __vtmapperClearManualMapping {%2};
+    }; #ELSEIF {"$action" == "LOCATE"} {
+        __vtmapperLocateOnManualMap;
+    }; #ELSE {
+        _error {Unknown action $action. Only START, STOP, CLEAR, and LOCATE are supported.};
+    };
+};
+
+
+#NOP --------------------------------------------------------------------------;
+#NOP Private Aliases.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Call when movement blocked.;
+#ALIAS {__vtmapperMovementWasBlocked} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {PAUSED}}} {
+        _bell ring;
+        #MAP {UNDO};
+    };
+
+    _flagsSetFlag {VT_MAPPER} {MOVEMENT_BLOCKED} {1};
+};
+
+#NOP Handle GMCP room data when in manual mode.;
+#ALIAS {__vtmapperRoomInfoHandler_Manual} {
+    #NOP %0;
+    _trace {__vtmapperRoomInfoHandler_Manual};
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {ACTIVE}}} {
+        _warn {VT Mapper (Manual): Manual mapping while inactive. Manual map progress will not be saved!};
+    };
+
+    __vtmapperUpdateRoom_Manual;
+
+    #IF {@_maputilsIsCurrentRoomDisorient{}} {
+        _vtmapperDizzy;
+        _warn {You appear to be in a DISORIENT room. Manual mapping is now paused.};
+    };
+
+    _eventFire {VT MAP UPDATED};
+};
+
+#NOP Update room when manually mapping.;
+#ALIAS {__vtmapperUpdateRoom_Manual} {
+    #NOP %0;
+    __vtmapperUpdateExits_Manual;
+    __vtmapperUpdateFirstVisitProperties;
+    __vtmapperUpdateFirstVisitProperties_Manual;
+    __vtmapperUpdateEveryVisitProperties;
+};
+
+#NOP Handle GMCP room data when in GMCP mode.;
+#ALIAS {__vtmapperRoomInfoHandler_GMCP} {
+    #NOP %0;
+    _trace {__vtmapperRoomInfoHandler_GMCP};
+    #LOCAL {vnum} {$GMCP[room][info][num]};
+    #IF {$vnum <= 0} {
+        #NOP Not a real room.;
+        _warn {VT Mapper (GMCP): Ignoring room with negative vnum};
+        #RETURN;
+    };
+
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {ACTIVE}}} {
+        #NOP If we're not in active mapping mode, the only thing we should be;
+        #NOP doing is moving to the room if it exists on our map.;
+        #IF {@_maputilsIsRoomInMap{{$vnum}}} {
+            #NOP Existing room.;
+            __vtmapperGoToRoom {$vnum};
+            _eventFire {VT MAP UPDATED};
+        }; #ELSE {
+            _warn {VT Mapper (GMCP): Moving through unmapped rooms while inactive!};
+        };
+
+        #NOP Do nothing else.;
+        #RETURN;
+    };
+
+    #NOP Go to room (possibly creating it), and update its properties.;
+    __vtmapperGoToRoom {$vnum};
+    __vtmapperUpdateRoom;
+    _eventFire {VT MAP UPDATED};
+};
+
+#NOP Go to the specified room.;
+#NOP %1 - vnum.;
+#ALIAS {__vtmapperGoToRoom} {
+    #NOP %0;
+    #NOP Go to the room.;
+    #MAP {GOTO} {%1} {DIG};
+};
+
+#NOP Update a room's exits and properties.;
+#NOP %1 - (0|1) Force "first visit" behavior. Default 0.;
+#ALIAS {__vtmapperUpdateRoom} {
+    #NOP %0;
+    #IF {"%1" == "1"} {
+        #NOP Forcing first visit behavior.;
+        #LOCAL {firstVisit} {1};
+    }; #ELSE {
+        #LOCAL {firstVisit} {@_maputilsIsFirstVisit{}};
+    };
+
+    #NOP Update the room's exits.;
+    __vtmapperUpdateExits;
+
+    #NOP Update the room's properties.;
+    #IF {$firstVisit} {
+        #NOP Only update certain properties on first visit.;
+        __vtmapperUpdateFirstVisitProperties;
+    };
+
+    #NOP Update some properties every visit.;
+    __vtmapperUpdateEveryVisitProperties;
+};
+
+#NOP Update the local map exits based on current GMCP room data.;
+#ALIAS {__vtmapperUpdateExits} {
+    #NOP %0;
+    _trace {__vtmapperUpdateExits};
+    #LOCAL {localExits} {};
+    #MAP {GET} {ROOMEXITS} {localExits};
+
+    #LOCAL {gmcpExits} {$GMCP[room][info][exits]};
+
+    #NOP Loop through exits in the GMCP data.;
+    #LOCAL {gmcpExit} {};
+    #FOREACH {*gmcpExits[]} {gmcpExit} {
+        #NOP Ignore the "door" entry;
+        #IF {"$gmcpExit" == "door"} {
+            #CONTINUE;
+        };
+
+        #NOP Ignore fake rooms (-99 vnum), and rooms we already have linked.;
+        #IF {$gmcpExits[$gmcpExit] < 1 || &localExits[$gmcpExit]} {
+            #CONTINUE;
+        };
+
+        #NOP Dig to the room.;
+        #MAP {DIG} {$gmcpExit} {$gmcpExits[$gmcpExit]};
+
+        #NOP If it's a room we haven't visited yet, set the color.;
+        #IF {@_maputilsIsFirstVisit{{$gmcpExits[$gmcpExit]}}} {
+            #MAP {SET} {ROOMCOLOR} {$MAPPER_ROOM_COLORS[UNVISITED]} {$gmcpExits[$gmcpExit]};
+        };
+    };
+};
+
+#ALIAS {__vtmapperUpdateExits_Manual} {
+    #NOP %0;
+    _trace {__vtmapperUpdateExits_Manual};
+    #LOCAL {localExits} {};
+    #MAP {GET} {ROOMEXITS} {localExits};
+
+    #LOCAL {gmcpExits} {$GMCP[room][info][exits]};
+
+    #NOP Loop through exits in the GMCP data.;
+    #LOCAL {gmcpExit} {};
+    #FOREACH {*gmcpExits[]} {gmcpExit} {
+        #NOP Ignore the "door" entry and existing links that are supposed to be;
+        #NOP there.;
+        #IF {"$gmcpExit" == "door" || &localExits[$gmcpExit]} {
+            #CONTINUE;
+        };
+
+        #IF {$gmcpExits[$gmcpExit] < 1} {
+            #NOP This is a fake room.;
+            #NOP Dig to link to room.;
+            #MAP {DIG} {$gmcpExit};
+
+            #NOP Re-read local exits to get vnum.;
+            #MAP {GET} {ROOMEXITS} {localExits};
+            #LOCAL {newVnum} {$localExits[$gmcpExit]};
+        }; #ELSE {
+            #NOP This is a real room.;
+            #LOCAL {newVnum} {$gmcpExits[$gmcpExit]};
+            #MAP {DIG} {$gmcpExit} {$newVnum};
+            #MAP {LINK} {$gmcpExit} {$newVnum} {BOTH};
+        };
+
+        #NOP If it's a room we haven't visited yet, set the color.;
+        #IF {@_maputilsIsFirstVisit{{$newVnum}}} {
+            #MAP {SET} {ROOMCOLOR} {$MAPPER_ROOM_COLORS[UNVISITED]} {$newVnum};
+        };
+    };
+
+    #NOP There's a block in a dead alias below that used to be here...;
+};
+
+#NOP This used to be up above, but decided against it for now as it can cause;
+#NOP large sections of manual map to become unlinked if you end up removing an;
+#NOP up/down link.;
+#ALIAS {___________} {
+    #NOP As long as current room is a fake room and not disorient, prune;
+    #NOP existing exits we no longer see in the GMCP data. This shouldn't be;
+    #NOP necessary, but it helps with cleanup if the manual map falls out of;
+    #NOP alignment somehow.;
+    #IF {$GMCP[room][info][num] < 0 && !@_flagsGetFlag{{VT_MAPPER}; {PAUSED}}} {
+        #LOCAL {localExit} {};
+        #FOREACH {*localExits[]} {localExit} {
+            #IF {!&GMCP[room][info][exits][$localExit]} {
+                #NOP This deletes the whole room, but again we're cleaning up;
+                #NOP misalignment. The room will just get re-created later.;
+                #MAP {UNLINK} {$localExit} both;
+            };
+        };
+    };
+};
+
+#ALIAS {__vtmapperUpdateFirstVisitProperties} {
+    #NOP %0;
+    _trace {__vtmapperUpdateFirstVisitProperties};
+    #MAP {SET} {ROOMCOLOR} {@_maputilsGetRoomColor{}};
+};
+
+#ALIAS {__vtmapperUpdateFirstVisitProperties_Manual} {
+    #LOCAL {exits} {};
+    #MAP {GET} {ROOMEXITS} {exits};
+    #IF {&exits[u] > 0} {
+        #MAP {SET} {ROOMCOLOR} {<168>};
+    }; #ELSEIF {&exits[d] > 0} {
+        #MAP {SET} {ROOMCOLOR} {<158>};
+    }; #ELSEIF {@_maputilsIsCurrentRoomDisorient{}} {
+        #MAP {SET} {ROOMCOLOR} {<148>};
+        #MAP {SET} {ROOMSYMBOL} {?};
+    };
+};
+
+#ALIAS {__vtmapperUpdateEveryVisitProperties} {
+    #NOP %0;
+    _trace {__vtmapperUpdateEveryVisitProperties};
+    #LOCAL {room} {$GMCP[room][info]};
+
+    #NOP Manual mapping gets custom roomarea values.;
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        #MAP {SET} {ROOMAREA} {MANUAL $room[zone]};
+    }; #ELSE {
+        #MAP {SET} {ROOMAREA} {$room[zone]};
+    };
+
+    #MAP {SET} {ROOMNAME} {$room[name]};
+    #MAP {SET} {ROOMID} {@_maputilsGetRoomId{}};
+
+    #NOP Setting terrain gets its own function as it requires some logic.;
+    __vtmapperUpdateTerrain;
+
+    #NOP Set room weight.;
+    #IF {"$VT_MAPPER_TERRAIN_WEIGHTS[$room[terrain]]" != ""} {
+        #MAP {SET} {ROOMWEIGHT} {$VT_MAPPER_TERRAIN_WEIGHTS[$room[terrain]]};
+    };
+};
+
+#ALIAS {__vtmapperUpdateTerrain} {
+    #NOP %0;
+    #LOCAL {room} {$GMCP[room][info]};
+
+    #NOP Get the existing terrain set for this room.;
+    #LOCAL {terrain} {};
+    #MAP {GET} {ROOMTERRAIN} {terrain};
+    #FORMAT {terrain} {%.2s} {$terrain};
+
+    #NOP Only set terrain if it isn't custom. all custom terrains should be;
+    #NOP prefixed with "c_" so the mapper doesn't overwrite them.;
+    #IF {"$terrain" != "c_"} {
+        #MAP {SET} {ROOMTERRAIN} {$room[terrain]};
+    };
+
+    #NOP Ensure we create a terrain if one doesn't exist.;
+    #LINE QUIET #LINE CAPTURE {terrain} {#MAP {TERRAIN} {$room[terrain]}};
+    #IF {"$terrain" == ""} {
+        #MAP {TERRAIN} {$room[terrain]} { };
+    };
+};
+
+#ALIAS {__vtmapperStopManualMapping} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    _vtmapperUnpause;
+    #MAP {FLAG} {NOFOLLOW} {ON};
+    #MAP {FLAG} {STATIC} {ON};
+
+    _flagsSetFlag {VT_MAPPER} {MANUAL} {0};
+    _flagsSetFlag {MAPPER} {CLICK_TO_WALK} {1};
+
+    _info {Manual mapping mode disabled.};
+};
+
+#ALIAS {__vtmapperStartManualMapping} {
+    #NOP %0;
+    #NOP Assume you're IN a fake room, or there is an exit to a fake room from;
+    #NOP your current room. Set the flag and ensure we update the map based on;
+    #NOP which of those two scenarios you're in. If you're in neither...?;
+    #NOP ;
+    #NOP OR do we automatically detect when you enter a fake room and just turn;
+    #NOP on manual mode smoehow?;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    _flagsSetFlag {VT_MAPPER} {MANUAL} {1};
+
+    #MAP {FLAG} {NOFOLLOW} {OFF};
+    #MAP {FLAG} {STATIC} {OFF};
+    _flagsSetFlag {MAPPER} {CLICK_TO_WALK} {0};
+
+    _info {Manual mapping mode enabled.};
+};
+
+#NOP Clear manually mapped areas.;
+#NOP %1 - Real zone name to clear manual rooms from.;
+#ALIAS {__vtmapperClearManualMapping} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        _error {You cannot clear manual map data while in manual mapping mode.};
+        #RETURN;
+    };
+
+    #MAP {DESTROY} {AREA} {MANUAL %1};
+};
+
+#NOP Attempt to locate the player's current room in the manual map.
+#ALIAS {__vtmapperLocateOnManualMap} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {LOADED}}} {
+        #RETURN;
+    };
+
+    #IF {!@_flagsGetFlag{{VT_MAPPER}; {MANUAL}}} {
+        _error {LOCATE is only supported in manual mapping mode.};
+        #RETURN;
+    };
+
+    #LOCAL {gmcpRoomName} {};
+    #LOCAL {manualArea} {};
+
+    #LOCAL {listResults} {};
+    #LINE {QUIET} {
+        #LINE {CAPTURE} {listResults} {#MAP {LIST} {$gmcpRoomName} {@__getGMCPExits{}} {} {$manualArea}};
+    };
+
+    #LOCAL {rooms} {};
+    #LOCAL {listResult} {};
+    #FOREACH {$listResults[%*]} {listResult} {
+        #VARIABLE {__regexp} {};
+        #REGEXP {$listResult} {%!{vnum:\s+(\d+)}} {#VARIABLE {__regexp} {&1}};
+        #IF {"$__regexp" != ""} {
+            #LOCAL {rooms[$__regexp]} {};
+        };
+        #UNVARIABLE {__regexp};
+    };
+
+    #NOP At this point we have $rooms which has all the vnums we matched.;
+
+    #NOP If you're already in a matching room, let's say so.;
+    #IF {&rooms[$GMCP[room][info][num]]} {
+        _echo {You are already in a matching room. Removing that room from the list.};
+        #UNVARIABLE {rooms[$GMCP[room][info][num]]};
+    };
+
+    #IF {&rooms[] == 0} {
+        #NOP No matches.;
+        _echo {No matching rooms found.};
+    }; #ELSEIF {&rooms[] == 1} {
+        #NOP If there's only one remaining match, that's probably the one.;
+        _echo {One matching room found!};
+        #MAP {GOTO} {*rooms[+1]};
+    }; #ELSE {
+        #NOP Multiple matches. Display the IDs.;
+        _echo {Multiple matching rooms found.};
+        #LOCAL {rooms};
+    };
+}
+
+#FUNCTION {__getGMCPExits} {
+    #LOCAL {result} {};
+
+    #LOCAL {exit} {};
+    #FOREACH {*GMCP[room][info][exits][%*]} {exit} {
+        #IF {"$exit" == "door"} {
+            #CONTINUE;
+        };
+
+        #LOCAL {result} {$exit $result};
+    };
+
+    #LOCAL {length} {};
+    #FORMAT {length} {%L} {$result};
+    #FORMAT {result} {%.${length}s} {$result};
+
+    #RETURN {$result};
+}
+
+#CLASS {vtmapper} {CLOSE};
