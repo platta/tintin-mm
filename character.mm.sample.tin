@@ -1,0 +1,43 @@
+#NOP --------------------------------------------------------------------------;
+#NOP Sample character class file;
+#NOP --------------------------------------------------------------------------;
+#CLASS {mm.SAMPLE} {OPEN};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Functions and Aliases the base class will call while trying to connect.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP Put your character name in here.;
+#FUNCTION {__characterName} {
+    #RETURN {SAMPLE};
+};
+
+#NOP Put your character password in here.;
+#FUNCTION {__characterPassword} {
+    #RETURN {YOUR_PASSWORD};
+};
+
+#NOP Any actions that need to be done before starting the session.;
+#NOP E.G. Load any other classes your game requires to be in place before;
+#NOP logging in.;
+#ALIAS {__characterBeforeLogin} {
+    #NOP %0;
+    _desktopLayout;
+};
+
+#NOP Actions to perform immediately after starting the session.;
+#NOP E.G. Answer post-login game prompts to fully log in.;
+#ALIAS {__characterAfterLogin} {
+    #NOP %0;
+    #NOP Set an escape code equivalent to your personal color in the game.
+    #VARIABLE {PERSONAL_COLOR} {\e[0;38;5;105m};
+
+    #NOP Set a chat signature for clan/alliance talk.
+    #VARIABLE {CHAT_SIGNATURE} {YOUR_SIG };
+};
+
+#NOP --------------------------------------------------------------------------;
+#NOP Create aliases and set variables for this specific character.;
+#NOP --------------------------------------------------------------------------;
+
+#CLASS {mm.SAMPLE} {CLOSE};

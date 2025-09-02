@@ -2,6 +2,7 @@ gmcp.map
 gmcp.map.*
 mm_wilderness.db
 character.*.*.tin
+!character.*.sample.tin
 
 .DS_Store
 __pycache__/
