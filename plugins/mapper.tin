@@ -179,8 +179,14 @@ _panelCreate {map} {WIDGET} {mapWidget};
         #MATH {width} {%5 - %3 - 1};
         #MATH {height} {%4 - %2 - 1};
 
+        #LOCAL {mapName} {${GMCP[room][info][zone]}};
+        #IF {"$mapName" == "The Airship |UInconvenience|X"} {
+            #LOCAL {mapName} {Alyria};
+        };
+
         #LOCAL {result} {};
-        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_read" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" ${GMCP[room][info][coord][x]} ${GMCP[room][info][coord][y]} $width $height};
+        _trace {Reading wilderness map: "$__base/game.mm/plugins/mapper/mapper_read" "$__base/game.mm/plugins/mapper/${mapName}.map" ${GMCP[room][info][coord][x]} ${GMCP[room][info][coord][y]} $width $height};
+        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_read" "$__base/game.mm/plugins/mapper/${mapName}.map" ${GMCP[room][info][coord][x]} ${GMCP[room][info][coord][y]} $width $height};
         #DRAW {$BOX_COLOR} {$BOX_STYLE} {TALIGN} {BOX} {%2} {%3} {%4} {%5} $result[1..$height];
     }; #ELSE {
         #NOP Draw VT map.;

@@ -51,6 +51,63 @@ _eventHandlerRegister {SHIP SCAN} {_wildernessmapperShipScanHandler};
     };
 };
 
+_eventHandlerRegister {AIRSHIP INCONVENIENCE VIEW} {_wildernessmapperAirshipInconvenienceHandler};
+#ALIAS {_wildernessmapperAirshipInconvenienceHandler} {
+    #NOP %0;
+
+    #NOP Fake out the mapper a little so we can see the wilderness view.;
+    _flagsSetFlag {MAPPER} {WILDERNESS} {1};
+
+    #IF {@_flagsGetFlag{{WILDERNESS_MAPPER}; {ACTIVE}}} {
+        _flagsSetFlag {WILDERNESS_MAPPER} {AWAITING_PROMPT} {1};
+    };
+};
+
+_eventHandlerRegister {AIRSHIP INCONVENIENCE MOVE} {_wildernessmapperAirshipInconvenienceMoveHandler};
+#ALIAS {_wildernessmapperAirshipInconvenienceMoveHandler} {
+    #NOP %0;
+    #IF {@_flagsGetFlag{{WILDERNESS_MAPPER}; {ACTIVE}}} {
+        #IF {"%1" == "n"} {
+            #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] - 1};
+        }; #ELSEIF {"%1" == "ne"} {
+            #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] - 1};
+            #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] + 1};
+        }; #ELSEIF {"%1" == "e"} {
+            #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] + 1};
+        }; #ELSEIF {"%1" == "se"} {
+            #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] + 1};
+            #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] + 1};
+        }; #ELSEIF {"%1" == "s"} {
+            #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] + 1};
+        }; #ELSEIF {"%1" == "sw"} {
+            #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] + 1};
+            #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] - 1};
+        }; #ELSEIF {"%1" == "w"} {
+            #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] - 1};
+        }; #ELSEIF {"%1" == "nw"} {
+            #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] - 1};
+            #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] - 1};
+        };
+    };
+
+    #IF {$GMCP[room][info][coord][y] < 0} {
+        #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] + 1500};
+    };
+
+    #IF {$GMCP[room][info][coord][y] >= 1500} {
+        #MATH {GMCP[room][info][coord][y]} {$GMCP[room][info][coord][y] - 1500};
+    };
+
+    #IF {$GMCP[room][info][coord][x] < 0} {
+        #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] + 2300};
+    };
+
+    #IF {$GMCP[room][info][coord][y] > 2300} {
+        #MATH {GMCP[room][info][coord][x]} {$GMCP[room][info][coord][x] - 2300};
+    };
+};
+
+
 #NOP Prompt.;
 _eventHandlerRegister {PROMPT} {__wildernessmapperPromptHandler};
 #ALIAS {__wildernessmapperPromptHandler} {
@@ -82,6 +139,8 @@ _eventHandlerRegister {PROMPT} {__wildernessmapperPromptHandler};
     #NOP room header.;
     #LOCAL {roomLine} {0};
     #BUFFER {FIND} {%!{^(?:\e\[[0-9;]*m)+\(-{46}(?:\e\[[0-9;]*m)+---\)}} {roomLine};
+    #NOP Note that if we're on the airship inconvenience, we'll be triggered by;
+    #NOP a different action, but still use the above search to find the map.;
 
     #NOP If we just did ship scan, look for the crow's nest message.;
     #LOCAL {shipScanLine} {0};
@@ -251,8 +310,14 @@ _eventHandlerRegister {PROMPT} {__wildernessmapperPromptHandler};
         #NOP #REPLACE {fooline} {\x7B} {\x7B};
         #NOP #REPLACE {fooline} {\x7D} {\x7D};
 
+        #LOCAL {mapName} {${GMCP[room][info][zone]}};
+        #IF {"$mapName" == "The Airship |UInconvenience|X"} {
+            #LOCAL {mapName} {Alyria};
+        };
+
         #LOCAL {result} {};
-        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "$fooline"};
+        _trace {Sending wilderness map data "$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${mapName}.map" $bar $mapY "$fooline"};
+        #SCRIPT {result} {"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${mapName}.map" $bar $mapY "$fooline"};
 
         #NOP Leftover from attempts to make curly braces work.;
         #NOP _debug {LINE=\$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "\$LINE"'};
@@ -261,6 +326,62 @@ _eventHandlerRegister {PROMPT} {__wildernessmapperPromptHandler};
         #NOP #SCRIPT {result} {LINE=\$(echo -e "$fooline") bash -c '"$__base/game.mm/plugins/mapper/mapper_write" "$__base/game.mm/plugins/mapper/${GMCP[room][info][zone]}.map" $bar $mapY "\$LINE"'};
         #NOP #ECHO {$result};
     };
+};
+
+_eventHandlerRegister {SCAN RESULT} {__wildernessmapperScanResultHandler};
+#ALIAS {__wildernessmapperScanResultHandler} {
+    #NOP %0;
+    #IF {!@_flagsGetFlag{{MAPPER}; {WILDERNESS}}} {
+        #RETURN;
+    };
+
+    #IF {!&PANELS[map]} {
+        #NOP Map panel doesn't exist.;
+        #RETURN;
+    }
+
+    #VARIABLE {coords} {@_panelGetPanelCoords{{$PANELS[map]}}};
+
+    #IF {!$coords[visible]} {
+        #NOP Panel not visible.;
+        #RETURN;
+    }
+
+    #NOP Calculate center of map.;
+    #LOCAL {top} {$coords[top]};
+    #LOCAL {bottom} {$coords[bottom]};
+    #LOCAL {left} {$coords[left]};
+    #LOCAL {right} {$coords[right]};
+
+    #LOCAL {horizontalCenter} {};
+    #MATH {horizontalCenter} {$left + ($right - $left) / 2};
+
+    #LOCAL {verticalCenter} {};
+    #MATH {verticalCenter} {$top + ($bottom - $top) / 2};
+
+    #IF {"%2" == "n"} {
+        #MATH {verticalCenter} {$verticalCenter - %3};
+    }; #ELSEIF {"%2" == "ne"} {
+        #MATH {verticalCenter} {$verticalCenter - %3};
+        #MATH {horizontalCenter} {$horizontalCenter + %3};
+    }; #ELSEIF {"%2" == "e"} {
+        #MATH {horizontalCenter} {$horizontalCenter + %3};
+    }; #ELSEIF {"%2" == "se"} {
+        #MATH {verticalCenter} {$verticalCenter + %3};
+        #MATH {horizontalCenter} {$horizontalCenter + %3};
+    }; #ELSEIF {"%2" == "s"} {
+        #MATH {verticalCenter} {$verticalCenter + %3};
+    }; #ELSEIF {"%2" == "sw"} {
+        #MATH {verticalCenter} {$verticalCenter + %3};
+        #MATH {horizontalCenter} {$horizontalCenter - %3};
+    }; #ELSEIF {"%2" == "w"} {
+        #MATH {horizontalCenter} {$horizontalCenter - %3};
+    };
+    ; #ELSEIF {"%2" == "nw"} {
+        #MATH {verticalCenter} {$verticalCenter - %3};
+        #MATH {horizontalCenter} {$horizontalCenter - %3};
+    };
+    #SHOWME {<110>@<088>} {$verticalCenter} {$horizontalCenter};
 };
 
 #CLASS {wildernessmapper} {CLOSE};

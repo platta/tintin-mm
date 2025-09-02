@@ -97,6 +97,26 @@ _eventRegister {WIZARD EYE};
     _eventFire {WIZARD EYE};
 };
 
+#NOP Airship inconvenience;
+_eventRegister {AIRSHIP INCONVENIENCE VIEW};
+#ACTION {^Looking across the horizon, you see all of Alyria spread out below you:$} {
+    #NOP Disable this because the airship "skips" wilderness rooms that are;
+    #NOP inaccessible to the player. That can cause us to; fall out of sync in;
+    #NOP terms of sextant coordinates since airship move events don't provide a;
+    #NOP fresh GMCP payload.;
+    #NOP _eventFire {AIRSHIP INCONVENIENCE VIEW};
+};
+
+#NOP Tweak because no GMCP data comes in even though we're moving.;
+_eventRegister {AIRSHIP INCONVENIENCE MOVE};
+#ACTION {^The airship Inconvenience breezes through the air as it blows %1ward.$} {
+    #NOP Disable this because the airship "skips" wilderness rooms that are;
+    #NOP inaccessible to the player. That can cause us to; fall out of sync in;
+    #NOP terms of sextant coordinates since airship move events don't provide a;
+    #NOP fresh GMCP payload.;
+    #NOP _eventFire {AIRSHIP INCONVENIENCE MOVE} {$CARDINAL_DIRECTIONS[%1]};
+};
+
 #NOP --------------------------------------------------------------------------;
 #NOP Movement events.
 #NOP --------------------------------------------------------------------------;
