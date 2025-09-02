@@ -3,6 +3,9 @@
 #NOP --------------------------------------------------------------------------;
 #CLASS {mm} {OPEN};
 
+#NOP Version for game.mm.;
+#VARIABLE {VERSIONS[game.mm]} {v1.0.0};
+
 _pluginCreate {mm} {Materia Magica base plugin};
 
 #NOP Variable to track keypad movement and make sure we're not sending move;
