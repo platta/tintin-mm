@@ -338,14 +338,14 @@ _eventHandlerRegister {SCAN RESULT} {__wildernessmapperScanResultHandler};
     #IF {!&PANELS[map]} {
         #NOP Map panel doesn't exist.;
         #RETURN;
-    }
+    };
 
     #VARIABLE {coords} {@_panelGetPanelCoords{{$PANELS[map]}}};
 
     #IF {!$coords[visible]} {
         #NOP Panel not visible.;
         #RETURN;
-    }
+    };
 
     #NOP Calculate center of map.;
     #LOCAL {top} {$coords[top]};
