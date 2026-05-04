@@ -275,7 +275,4 @@ class Map:
         # results as a list.
         room_list = list(rooms)
 
-        return RoomInfo(
-            color=self._zoom.colors.combine(room_list),
-            symbol=self._zoom.symbols.combine(room_list)
-        )
+        return self._zoom.strategy.combine(room_list)

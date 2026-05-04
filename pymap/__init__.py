@@ -14,5 +14,6 @@ from ._symbol_strategy import (
     LeastCommonSymbolStrategy,
     LowestValueSymbolStrategy
 )
+from ._zoom_strategy import ZoomStrategy, DefaultZoomStrategy
 from ._map import Map
 from ._zoom_info import ZoomInfo
