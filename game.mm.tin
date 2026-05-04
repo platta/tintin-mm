@@ -345,4 +345,72 @@ _eventHandlerRegister {NUMPAD SHIFT 0} {_mmNumpadShift0Handler}
     #SEND {inventory};
 };
 
+#NOP Numpad movement + scan.;
+_eventHandlerRegister {NUMPAD CTRL 8} {_mmNumpadCtrl8Handler};
+#ALIAS {_mmNumpadCtrl8Handler} {
+    #NOP %0;
+    n;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 9} {_mmNumpadCtrl9Handler};
+#ALIAS {_mmNumpadCtrl9Handler} {
+    #NOP %0;
+    ne;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 6} {_mmNumpadCtrl6Handler};
+#ALIAS {_mmNumpadCtrl6Handler} {
+    #NOP %0;
+    e;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 3} {_mmNumpadCtrl3Handler};
+#ALIAS {_mmNumpadCtrl3Handler} {
+    #NOP %0;
+    se;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 2} {_mmNumpadCtrl2Handler};
+#ALIAS {_mmNumpadCtrl2Handler} {
+    #NOP %0;
+    s;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 1} {_mmNumpadCtrl1Handler};
+#ALIAS {_mmNumpadCtrl1Handler} {
+    #NOP %0;
+    sw;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 4} {_mmNumpadCtrl4Handler};
+#ALIAS {_mmNumpadCtrl4Handler} {
+    #NOP %0;
+    w;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 7} {_mmNumpadCtrl7Handler};
+#ALIAS {_mmNumpadCtrl7Handler} {
+    #NOP %0;
+    nw;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL 5} {_mmNumpadCtrl5Handler};
+#ALIAS {_mmNumpadCtrl5Handler} {
+    #NOP %0;
+    look;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL PLUS} {_mmNumpadCtrlPlusHandler};
+#ALIAS {_mmNumpadCtrlPlusHandler} {
+    #NOP %0;
+    u;
+    scan;
+};
+_eventHandlerRegister {NUMPAD CTRL MINUS} {_mmNumpadCtrlMinusHandler};
+#ALIAS {_mmNumpadCtrlMinusHandler} {
+    #NOP %0;
+    d;
+    scan;
+};
+
 #CLASS {mm} {CLOSE};
