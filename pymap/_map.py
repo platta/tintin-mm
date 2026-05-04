@@ -1,10 +1,8 @@
 """Interactive mapper utilities."""
 
-from io import BufferedReader
+from io import BufferedReader, BufferedRandom
 import sys
-from typing import Generator, Iterable, Dict
-
-import line_profiler
+from typing import Generator, Iterable, Dict, Optional, Union
 
 from ._constants import HEADER_BYTES, ROOM_BYTES
 from ._map_flags import MapFlags
@@ -15,15 +13,15 @@ from ._zoom_info import ZoomInfo
 class Map:
     """Represents a map file."""
 
-    def __init__(self, filename: str, zoom: ZoomInfo = None) -> None:
+    def __init__(self, filename: str, zoom: Optional[ZoomInfo] = None) -> None:
         """Initialize and instance of the class."""
         self._filename = filename
         self._info = self._read_info()
         self._zoom = zoom or ZoomInfo()
 
-        self._handle: BufferedReader = None
+        self._handle: Optional[Union[BufferedReader, BufferedRandom]] = None
 
-        self._cache: Dict[int, Dict[int, str]] = {}
+        self._cache: Dict[int, Dict[int, RoomInfo]] = {}
 
     @staticmethod
     def _get_bounding_box(x, y, width, height) -> BoundingBox:
@@ -74,7 +72,6 @@ class Map:
             for current_y in range(box.top, box.bottom, self._zoom.level):
                 yield self._read_row(box.left, current_y, width)
 
-    @line_profiler.profile
     def print(
         self,
         x: int,
@@ -117,7 +114,6 @@ class Map:
 
         return MapInfo(**info)
 
-    @line_profiler.profile
     def _read_row(
         self,
         x: int,
@@ -185,7 +181,6 @@ class Map:
 
                 self._cache[y][x] = self._read_single_room(x, y)
 
-    @line_profiler.profile
     def _read_rooms_for_zoom(
         self,
         x: int,
@@ -206,8 +201,7 @@ class Map:
                 else:
                     yield self._read_single_room(wrapped_x, wrapped_y)
 
-    @line_profiler.profile
-    def _wrap_x_coordinate(self, x: int) -> int:
+    def _wrap_x_coordinate(self, x: int) -> Optional[int]:
         """Wrap x coordinates that are negative or larger than max."""
         if x < 0 or x >= self._info.width:
             if not self._info.hwrap:
@@ -216,8 +210,7 @@ class Map:
                 return (x % self._info.width) % self._info.width
         return x
 
-    @line_profiler.profile
-    def _wrap_y_coordinate(self, y: int) -> int:
+    def _wrap_y_coordinate(self, y: int) -> Optional[int]:
         """Wrap y coordinates that are negative or larger than max."""
         if y < 0 or y >= self._info.height:
             if not self._info.vwrap:
@@ -228,6 +221,9 @@ class Map:
 
     def _seek_room(self, x: int, y: int) -> None:
         """Make sure the file pointer is sitting on the room we want."""
+        if self._handle is None:
+            return None
+
         offset = HEADER_BYTES + (y * self._info.width + x) * ROOM_BYTES
         if self._handle.tell() != offset:
             # Only seek when necessary.
@@ -264,7 +260,6 @@ class Map:
             color=int.from_bytes(self._handle.read(1), sys.byteorder)
         )
 
-    @ line_profiler.profile
     def _apply_zoom(
         self,
         rooms: Iterable[RoomInfo]
