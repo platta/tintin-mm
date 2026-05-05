@@ -20,6 +20,22 @@ _pluginCreate {mxp} {MXP support, incomplete};
 #NOP any custom elements defined using the !ELEMENT tag are added as well.;
 #VARIABLE {MXP_ELEMENTS} {};
 
+#NOP Maps custom element name -> click command template. When a custom element;
+#NOP has an entry here, _mxpCustomElementHandler renders the inner text as an;
+#NOP OSC-68 clickable link whose click sends the resolved command. Use &ATTR;
+#NOP placeholders in the template to reference attribute values from the tag.;
+#VARIABLE {MXP_CLICKABLE} {};
+
+#NOP Register a custom element to render as a clickable link.;
+#NOP %1 - Element name;
+#NOP {%2 - Click command template (use &ATTRNAME; to reference attributes)};
+#ALIAS {_mxpRegisterClickable} {
+    #NOP %0;
+    #LOCAL {name} {};
+    #FORMAT {name} {%u} {%1};
+    #VARIABLE {MXP_CLICKABLE[$name]} {%2};
+};
+
 #NOP --------------------------------------------------------------------------;
 #NOP MXP Element Management;
 #NOP --------------------------------------------------------------------------;
@@ -489,10 +505,38 @@ _mxpCreateAttribute {!ELEMENT} {EMPTY};
 };
 
 #NOP Handle any custom element when matched.;
+#NOP If MXP_CLICKABLE has an entry for this element's name, render the inner;
+#NOP text as an OSC-68 clickable link with the configured command. Otherwise;
+#NOP fall through to plain inner text.;
 #NOP %1 - Element definition;
 #NOP %2 - Parsed values from match;
 #FUNCTION {_mxpCustomElementHandler} {
+    #LOCAL {element} {%1};
     #LOCAL {values} {%2};
+    #LOCAL {name} {$element[name]};
+
+    #IF {&MXP_CLICKABLE[$name]} {
+        #LOCAL {command} {$MXP_CLICKABLE[$name]};
+
+        #NOP Resolve &ATTR placeholders for each declared attribute.;
+        #IF {&element[positional][]} {
+            #LOCAL {i} {};
+            #LOOP {1} {&element[positional][]} {i} {
+                #LOCAL {attrname} {$element[positional][$i][name]};
+                #REPLACE {command} {&$attrname;} {$values[$attrname]};
+            };
+        };
+        #IF {&element[attributes][]} {
+            #LOCAL {i} {};
+            #LOOP {1} {&element[attributes][]} {i} {
+                #LOCAL {attrname} {$element[attributes][$i][name]};
+                #REPLACE {command} {&$attrname;} {$values[$attrname]};
+            };
+        };
+
+        #RETURN {@_mxpLink{MXP; $command; $values[TEXT]}};
+    };
+
     #RETURN {$values[TEXT]};
 };
 
@@ -742,20 +786,32 @@ _eventHandlerRegister {IAC DO MXP} {_mxpDoMxpHandler};
 };
 
 #NOP --------------------------------------------------------------------------;
-#NOP Stuff for link clicking - to visit later;
+#NOP Link clicking;
 #NOP --------------------------------------------------------------------------;
 
+#NOP Click handler -- send the OSC-68 link's command payload to the MUD.;
 _eventHandlerRegister {PRESSED LINK MXP MOUSE BUTTON ONE} {_mxpPressedLinkHandler};
 #ALIAS {_mxpPressedLinkHandler} {
     #NOP %0;
+    _info {MXP click sending: '%5'};
     #SEND {%5};
 };
 
-#NOP #SUBSTITUTE {<check_eq_scrying desc="%1">%2</check_eq_scrying>} {@mxp_link{{MXP}; {check equipment scrying %1}; {%2}}};
-#FUNCTION {mxp_link} {
-    _debug {MXP LINK};
-    #line sub esc #var result {\e]68;1;%1;%2\a\e[4m%3\e[24m};
+#NOP Render an OSC-68 clickable link as a string. The visible text is wrapped;
+#NOP in underline-on/off so it's visually distinct from non-clickable text.;
+#NOP %1 - Link name (becomes the {NAME} in PRESSED LINK {NAME} MOUSE BUTTON ONE);
+#NOP %2 - Command to send when clicked;
+#NOP %3 - Visible text;
+#FUNCTION {_mxpLink} {
+    #RETURN {\e]68;1;%1;%2\a\e[4m%3\e[24m};
 };
+
+#NOP --------------------------------------------------------------------------;
+#NOP MM-specific clickable element registrations.;
+#NOP --------------------------------------------------------------------------;
+
+#NOP TODO: Move this to a MM-specific file in the subfolder.
+_mxpRegisterClickable {check_eq_scrying} {check equipment scrying &DESC;};
 
 #NOP --------------------------------------------------------------------------;
 #NOP Flat substitutions for special characters;
