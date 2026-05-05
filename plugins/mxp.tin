@@ -577,7 +577,10 @@ _mxpCreateAttribute {!ENTITY} {REMOVE};
         #IF {&MXP[$values[NAME]][value][]} {
             #LOCAL {i} {};
             #LOOP {1} {&MXP[$values[NAME]][value][]} {i} {
-                #IF {"$MXP[$values[NAME]][value][$i]" === "$values[VALUE]"}
+                #IF {"$MXP[$values[NAME]][value][$i]" === "$values[VALUE]"} {
+                    #LIST {MXP[$values[NAME]][value]} {DELETE} {$i};
+                    #BREAK;
+                };
             };
         };
     }; #ELSE {
