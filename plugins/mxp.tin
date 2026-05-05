@@ -701,6 +701,7 @@ _mxpCreatePositional {EXPIRE} {NAME};
 _mxpCreateElement {VERSION} {0} {1} {@_mxpVersionHandler};
 #FUNCTION {_mxpVersionHandler} {
     #SEND {\e[1z<VERSION MXP=1.0 CLIENT=TINTIN++ VERSION=2.02.04>};
+    #RETURN {};
 };
 
 #NOP --------------------------------------------------------------------------;
