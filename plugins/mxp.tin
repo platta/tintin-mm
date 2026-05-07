@@ -20,22 +20,6 @@ _pluginCreate {mxp} {MXP support, incomplete};
 #NOP any custom elements defined using the !ELEMENT tag are added as well.;
 #VARIABLE {MXP_ELEMENTS} {};
 
-#NOP Maps custom element name -> click command template. When a custom element;
-#NOP has an entry here, _mxpCustomElementHandler renders the inner text as an;
-#NOP OSC-68 clickable link whose click sends the resolved command. Use &ATTR;
-#NOP placeholders in the template to reference attribute values from the tag.;
-#VARIABLE {MXP_CLICKABLE} {};
-
-#NOP Register a custom element to render as a clickable link.;
-#NOP %1 - Element name;
-#NOP {%2 - Click command template (use &ATTRNAME; to reference attributes)};
-#ALIAS {_mxpRegisterClickable} {
-    #NOP %0;
-    #LOCAL {name} {};
-    #FORMAT {name} {%u} {%1};
-    #VARIABLE {MXP_CLICKABLE[$name]} {%2};
-};
-
 #NOP --------------------------------------------------------------------------;
 #NOP MXP Element Management;
 #NOP --------------------------------------------------------------------------;
@@ -302,6 +286,7 @@ _pluginCreate {mxp} {MXP support, incomplete};
             #LIST {matches} {GET} {1} {unquoted};
             #LIST {matches} {DELETE} {1};
 
+
             #LOCAL {unquoted} {@_mxpUnquote{{$unquoted}}};
             #LOCAL {parsed[$element[positional][$i][name]]} {$unquoted};
         };
@@ -452,6 +437,222 @@ _pluginCreate {mxp} {MXP support, incomplete};
 };
 
 #NOP --------------------------------------------------------------------------;
+#NOP Click payload encoding;
+#NOP --------------------------------------------------------------------------;
+#NOP The OSC-68 link's command field is used as an opaque payload that carries;
+#NOP enough state to synthesize MM commands at click time. This lets the same;
+#NOP rendered link drive left-click (default action), right-click (context;
+#NOP menu), and eventually mouseover (tooltip) without precomputing each.;
+#NOP;
+#NOP Payload format:;
+#NOP   ELEMENT_NAME \x02 KEY1 \x03 VALUE1 \x02 KEY2 \x03 VALUE2 ...;
+#NOP;
+#NOP   \x02 - field separator;
+#NOP   \x03 - key/value separator;
+#NOP   \x01 - encoded literal semicolon already used by _mxpLink for OSC-68;
+#NOP          transport, decoded back by _mxpPressedLinkHandler before the;
+#NOP          payload is parsed.;
+
+#NOP Encode element identity + parsed instance values into a payload.;
+#NOP %1 - Element struct;
+#NOP %2 - Parsed values from match;
+#FUNCTION {_mxpEncodePayload} {
+    #LOCAL {element} {%1};
+    #LOCAL {values} {%2};
+
+    #LOCAL {payload} {$element[name]};
+
+    #IF {&element[positional][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&element[positional][]} {i} {
+            #LOCAL {key} {$element[positional][$i][name]};
+            #LOCAL {payload} {$payload\x02$key\x03$values[$key]};
+        };
+    };
+
+    #IF {&element[attributes][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&element[attributes][]} {i} {
+            #LOCAL {key} {$element[attributes][$i][name]};
+            #LOCAL {payload} {$payload\x02$key\x03$values[$key]};
+        };
+    };
+
+    #NOP TEXT (inner content) is intentionally NOT included in the payload --;
+    #NOP MM's HREF/HINT templates reference declared attributes (e.g. &desc);
+    #NOP not the inner text, and including TEXT made the OSC-68 sequence long;
+    #NOP enough to confuse tt++'s parser and double-render the visible region.;
+
+    #RETURN {$payload};
+};
+
+#NOP Decode a payload produced by _mxpEncodePayload into a values dict. The;
+#NOP element name lives at result[__name] and the remaining keys are from;
+#NOP the original parsed values.;
+#NOP %1 - Encoded payload;
+#FUNCTION {_mxpDecodePayload} {
+    #LOCAL {payload} {%1};
+
+    #LOCAL {fields} {$payload};
+    #LIST {fields} {EXPLODE} {\x02};
+
+    #VARIABLE {_mxp_decode_tmp} {};
+    #VARIABLE {_mxp_decode_tmp[__name]} {$fields[1]};
+
+    #LOCAL {i} {};
+    #LOOP {2} {&fields[]} {i} {
+        #LOCAL {pair} {$fields[$i]};
+        #LIST {pair} {EXPLODE} {\x03};
+        #IF {&pair[] >= 2} {
+            #VARIABLE {_mxp_decode_tmp[$pair[1]]} {$pair[2]};
+        };
+    };
+
+    #LOCAL {result} {$_mxp_decode_tmp};
+    #UNVARIABLE {_mxp_decode_tmp};
+    #RETURN {$result};
+};
+
+#NOP Substitute MXP-style placeholders (the &ATTR form) in a template with;
+#NOP values from a dict.;
+#NOP Handles both literal & and the __MXP_AMP__ sentinel (the global incoming;
+#NOP substitution rewrites & to that sentinel before any TinTin parsing). After;
+#NOP substitution any remaining sentinel tokens are restored to literal &.;
+#NOP %1 - Template string;
+#NOP %2 - Element struct (for the attribute name list);
+#NOP %3 - Values dict (key -> resolved value);
+#FUNCTION {_mxpSubstituteValues} {
+    #LOCAL {template} {%1};
+    #LOCAL {element} {%2};
+    #LOCAL {values} {%3};
+
+    #IF {&element[positional][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&element[positional][]} {i} {
+            #LOCAL {attrname} {$element[positional][$i][name]};
+            #REPLACE {template} {%i__MXP_AMP__$attrname;} {$values[$attrname]};
+            #REPLACE {template} {%i&$attrname;} {$values[$attrname]};
+        };
+    };
+    #IF {&element[attributes][]} {
+        #LOCAL {i} {};
+        #LOOP {1} {&element[attributes][]} {i} {
+            #LOCAL {attrname} {$element[attributes][$i][name]};
+            #REPLACE {template} {%i__MXP_AMP__$attrname;} {$values[$attrname]};
+            #REPLACE {template} {%i&$attrname;} {$values[$attrname]};
+        };
+    };
+
+    #REPLACE {template} {__MXP_AMP__} {&};
+    #RETURN {$template};
+};
+
+#NOP Decode the HTML entities that MM uses to escape characters inside an;
+#NOP href= attribute. Operates on a local in place.;
+#NOP %1 - Variable name to decode;
+#ALIAS {_mxpDecodeHrefEntities} {
+    #NOP %0;
+    #REPLACE {%1} {__MXP_AMP__#34;} {"};
+    #REPLACE {%1} {__MXP_AMP__#39;} {'};
+    #REPLACE {%1} {__MXP_AMP__lt;} {<};
+    #REPLACE {%1} {__MXP_AMP__gt;} {>};
+    #REPLACE {%1} {__MXP_AMP__amp;} {&};
+};
+
+#NOP Synthesize the Nth pipe-separated href command from an element's <send>;
+#NOP definition with current values substituted. Returns empty string if the;
+#NOP definition has no href= or the index is out of range.;
+#NOP %1 - Element struct;
+#NOP %2 - Values dict;
+#NOP %3 - 1-based index into the | -separated href list;
+#FUNCTION {_mxpSynthesizeHref} {
+    #LOCAL {element} {%1};
+    #LOCAL {values} {%2};
+    #LOCAL {index} {%3};
+
+    #VARIABLE {_mxp_synth_tmp} {};
+    #REGEXP {$element[definition]} {%!{href='([^']*)'}} {
+        #LOCAL {href} {&1};
+        #LIST {href} {EXPLODE} {|};
+        #IF {$index <= &href[]} {
+            #VARIABLE {_mxp_synth_tmp} {$href[$index]};
+        };
+    };
+
+    #LOCAL {raw} {$_mxp_synth_tmp};
+    #UNVARIABLE {_mxp_synth_tmp};
+
+    #IF {"$raw" == ""} {
+        #RETURN {};
+    };
+
+    _mxpDecodeHrefEntities {raw};
+    #RETURN {@_mxpSubstituteValues{{$raw}; {$element}; {$values}}};
+};
+
+#NOP Synthesize all pipe-separated href commands from an element's <send>;
+#NOP definition. Returns a TinTin list (brace-grouped) -- iterate via;
+#NOP   #LOOP {1} {&list[]} {i} { ... $list[$i] ... };
+#NOP %1 - Element struct;
+#NOP %2 - Values dict;
+#FUNCTION {_mxpSynthesizeHrefs} {
+    #LOCAL {element} {%1};
+    #LOCAL {values} {%2};
+
+    #VARIABLE {_mxp_synth_list} {};
+    #LIST {_mxp_synth_list} {CREATE} {};
+
+    #REGEXP {$element[definition]} {%!{href='([^']*)'}} {
+        #LOCAL {href} {&1};
+        #LIST {href} {EXPLODE} {|};
+
+        #LOCAL {i} {};
+        #LOOP {1} {&href[]} {i} {
+            #LOCAL {raw} {$href[$i]};
+            _mxpDecodeHrefEntities {raw};
+            #LOCAL {resolved} {@_mxpSubstituteValues{{$raw}; {$element}; {$values}}};
+            #LIST {_mxp_synth_list} {ADD} {$resolved};
+        };
+    };
+
+    #LOCAL {result} {$_mxp_synth_list};
+    #UNVARIABLE {_mxp_synth_list};
+    #RETURN {$result};
+};
+
+#NOP Synthesize all pipe-separated hint labels from an element's <send>;
+#NOP definition. Per MXP spec the first hint is the tooltip text and the;
+#NOP remaining hints pair with href entries (HINT[i+1] labels HREF[i]).;
+#NOP Returns a TinTin list with all hints in declaration order, leaving the;
+#NOP caller to decide which slot is tooltip vs which pair with hrefs.;
+#NOP %1 - Element struct;
+#NOP %2 - Values dict;
+#FUNCTION {_mxpSynthesizeHints} {
+    #LOCAL {element} {%1};
+    #LOCAL {values} {%2};
+
+    #VARIABLE {_mxp_synth_list} {};
+    #LIST {_mxp_synth_list} {CREATE} {};
+
+    #REGEXP {$element[definition]} {%!{hint='([^']*)'}} {
+        #LOCAL {hint} {&1};
+        #LIST {hint} {EXPLODE} {|};
+
+        #LOCAL {i} {};
+        #LOOP {1} {&hint[]} {i} {
+            #LOCAL {raw} {$hint[$i]};
+            _mxpDecodeHrefEntities {raw};
+            #LOCAL {resolved} {@_mxpSubstituteValues{{$raw}; {$element}; {$values}}};
+            #LIST {_mxp_synth_list} {ADD} {$resolved};
+        };
+    };
+
+    #LOCAL {result} {$_mxp_synth_list};
+    #UNVARIABLE {_mxp_synth_list};
+    #RETURN {$result};
+};
+
+#NOP --------------------------------------------------------------------------;
 #NOP Built-In MXP Elements;
 #NOP --------------------------------------------------------------------------;
 
@@ -504,40 +705,20 @@ _mxpCreateAttribute {!ELEMENT} {EMPTY};
     #RETURN {};
 };
 
-#NOP Handle any custom element when matched.;
-#NOP If MXP_CLICKABLE has an entry for this element's name, render the inner;
-#NOP text as an OSC-68 clickable link with the configured command. Otherwise;
-#NOP fall through to plain inner text.;
+#NOP Handle any custom element when matched. Renders the inner text as an;
+#NOP OSC-68 clickable link carrying an opaque payload that encodes the;
+#NOP element identity plus the parsed instance values. The click handlers;
+#NOP decode that payload at click time and synthesize commands on demand,;
+#NOP so left-click, right-click, and (eventually) hover all draw from the;
+#NOP same data without precomputing each.;
 #NOP %1 - Element definition;
 #NOP %2 - Parsed values from match;
 #FUNCTION {_mxpCustomElementHandler} {
     #LOCAL {element} {%1};
     #LOCAL {values} {%2};
-    #LOCAL {name} {$element[name]};
 
-    #IF {&MXP_CLICKABLE[$name]} {
-        #LOCAL {command} {$MXP_CLICKABLE[$name]};
-
-        #NOP Resolve &ATTR placeholders for each declared attribute.;
-        #IF {&element[positional][]} {
-            #LOCAL {i} {};
-            #LOOP {1} {&element[positional][]} {i} {
-                #LOCAL {attrname} {$element[positional][$i][name]};
-                #REPLACE {command} {&$attrname;} {$values[$attrname]};
-            };
-        };
-        #IF {&element[attributes][]} {
-            #LOCAL {i} {};
-            #LOOP {1} {&element[attributes][]} {i} {
-                #LOCAL {attrname} {$element[attributes][$i][name]};
-                #REPLACE {command} {&$attrname;} {$values[$attrname]};
-            };
-        };
-
-        #RETURN {@_mxpLink{MXP; $command; $values[TEXT]}};
-    };
-
-    #RETURN {$values[TEXT]};
+    #LOCAL {payload} {@_mxpEncodePayload{{$element}; {$values}}};
+    #RETURN {@_mxpLink{MXP; {$payload}; {$values[TEXT]}}};
 };
 
 #NOP --------------------------------------------------------------------------;
@@ -789,12 +970,78 @@ _eventHandlerRegister {IAC DO MXP} {_mxpDoMxpHandler};
 #NOP Link clicking;
 #NOP --------------------------------------------------------------------------;
 
-#NOP Click handler -- send the OSC-68 link's command payload to the MUD.;
+#NOP Left-click handler -- decode the link's payload, synthesize the default;
+#NOP href command (first | -separated segment) using the values that were;
+#NOP captured at render time, and send it. Falls back to an examine of the;
+#NOP visible DESC if the element's definition has no <send href=...>.;
 _eventHandlerRegister {PRESSED LINK MXP MOUSE BUTTON ONE} {_mxpPressedLinkHandler};
 #ALIAS {_mxpPressedLinkHandler} {
     #NOP %0;
-    _info {MXP click sending: '%5'};
-    #SEND {%5};
+    #LOCAL {payload} {%5};
+    #NOP Decode the semicolon sentinel that _mxpLink inserted to survive;
+    #NOP OSC-68 transport.;
+    #REPLACE {payload} {\x01} {;};
+
+    #LOCAL {decoded} {@_mxpDecodePayload{{$payload}}};
+    #LOCAL {element} {@_mxpGetElement{{$decoded[__name]}}};
+    #IF {!&element[name]} {
+        _warn {MXP click: no element registered for '$decoded[__name]'};
+        #RETURN;
+    };
+
+    #LOCAL {cmd} {@_mxpSynthesizeHref{{$element}; {$decoded}; 1}};
+    #IF {"$cmd" == ""} {
+        #LOCAL {cmd} {@_mxpSubstituteValues{{examine "&DESC;"}; {$element}; {$decoded}}};
+    };
+
+    #LOCAL {first} {};
+    #FORMAT {first} {%.1s} {$cmd};
+    #IF {"$first" == "_" || "$first" == "#"} {
+        #NOP TinTin command -- execute locally.;
+        $cmd;
+    }; #ELSE {
+        #NOP MUD command -- send to server.;
+        _info {MXP click sending: '$cmd'};
+        #SEND {$cmd};
+    };
+};
+
+#NOP Right-click handler -- decode the link's payload, synthesize every;
+#NOP href/hint pair, and log them. UI rendering of an actual context menu;
+#NOP is a follow-up. This just proves the synthesis path works.;
+_eventHandlerRegister {PRESSED LINK MXP MOUSE BUTTON THREE} {_mxpRightClickHandler};
+#ALIAS {_mxpRightClickHandler} {
+    #NOP %0;
+    #LOCAL {payload} {%5};
+    #REPLACE {payload} {\x01} {;};
+
+    #LOCAL {decoded} {@_mxpDecodePayload{{$payload}}};
+    #LOCAL {element} {@_mxpGetElement{{$decoded[__name]}}};
+    #IF {!&element[name]} {
+        _warn {MXP right-click: no element registered for '$decoded[__name]'};
+        #RETURN;
+    };
+
+    #LOCAL {hrefs} {@_mxpSynthesizeHrefs{{$element}; {$decoded}}};
+    #LOCAL {hints} {@_mxpSynthesizeHints{{$element}; {$decoded}}};
+
+    _info {MXP right-click on <$element[name]>:};
+
+    #NOP HINT[1] is the tooltip per MXP spec, and HINT[i+1] labels HREF[i].;
+    #IF {&hints[]} {
+        _info {  tooltip: '$hints[1]'};
+    };
+
+    #LOCAL {i} {};
+    #LOOP {1} {&hrefs[]} {i} {
+        #LOCAL {hintIndex} {};
+        #MATH {hintIndex} {$i + 1};
+        #LOCAL {label} {};
+        #IF {$hintIndex <= &hints[]} {
+            #LOCAL {label} {$hints[$hintIndex]};
+        };
+        _info {  [$i] '$label' -> '$hrefs[$i]'};
+    };
 };
 
 #NOP Render an OSC-68 clickable link as a string. The visible text is wrapped;
@@ -803,23 +1050,39 @@ _eventHandlerRegister {PRESSED LINK MXP MOUSE BUTTON ONE} {_mxpPressedLinkHandle
 #NOP %2 - Command to send when clicked;
 #NOP %3 - Visible text;
 #FUNCTION {_mxpLink} {
-    #RETURN {\e]68;1;%1;%2\a\e[4m%3\e[24m};
+    #LOCAL {text} {%3};
+    #LOCAL {cmd} {%2};
+    #NOP Strip embedded SGR resets and explicit underline-off codes from the;
+    #NOP visible text -- tt++ treats them as the end of the link region, which;
+    #NOP strands the OSC-68 metadata on a leading empty segment and breaks the;
+    #NOP click target. MM emits its own resets around the tag anyway.;
+    #REPLACE {text} {\e\[0m} {};
+    #REPLACE {text} {\e\[24m} {};
+    #NOP Encode any semicolon in the command -- OSC-68 uses semicolon as the;
+    #NOP field separator, so a literal semicolon in the command would corrupt;
+    #NOP the link. Use a control byte (\x01) as a sentinel and let the click;
+    #NOP handler decode it back to a semicolon before forwarding to the MUD.;
+    #REPLACE {cmd} {;} {\x01};
+    #NOP Append a full SGR reset after the underline-off so any color the MUD;
+    #NOP set inside the link body does not leak into text that follows. We;
+    #NOP stripped MM's own \e[0m from inside the visible region to keep the;
+    #NOP link contiguous, so we have to put one back outside it.;
+    #RETURN {\e]68;1;%1;$cmd\a\e[4m$text\e[24m\e[0m};
 };
-
-#NOP --------------------------------------------------------------------------;
-#NOP MM-specific clickable element registrations.;
-#NOP --------------------------------------------------------------------------;
-
-#NOP TODO: Move this to a MM-specific file in the subfolder.
-_mxpRegisterClickable {check_eq_scrying} {check equipment scrying &DESC;};
 
 #NOP --------------------------------------------------------------------------;
 #NOP Flat substitutions for special characters;
 #NOP --------------------------------------------------------------------------;
 
-#SUBSTITUTE {&lt;} {<};
-#SUBSTITUTE {&gt;} {>};
-#SUBSTITUTE {&quot;} {"};
-#SUBSTITUTE {&nbsp;} { };
+#SUBSTITUTE {&} {__MXP_AMP__} {1};
+
+#SUBSTITUTE {__MXP_AMP__} {&} {9};
+
+#SUBSTITUTE {&lt;} {<} {10};
+#SUBSTITUTE {&gt;} {>} {10};
+#SUBSTITUTE {&quot;} {"} {10};
+#SUBSTITUTE {&nbsp;} { } {10};
+#SUBSTITUTE {&amp;} {&} {10};
+
 
 #CLASS {mxp} {CLOSE};
